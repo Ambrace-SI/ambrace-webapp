@@ -37,26 +37,17 @@ describe("when a viva happened", () => {
 });
 
 describe("one row of the list", () => {
-  test("a finished viva shows its date and score, and has a report", () => {
-    expect(describeViva(viva({ score: 7 }), NOW)).toEqual({
+  test("a finished viva shows when it was, and has a report", () => {
+    expect(describeViva(viva(), NOW)).toEqual({
       id: "session-1",
       title: "Electricity",
-      detail: "21 Nov · 7/10",
+      detail: "21 Nov",
       hasReport: true,
     });
   });
 
-  test("a score of zero is still a score", () => {
-    expect(describeViva(viva({ score: 0 }), NOW).detail).toBe("21 Nov · 0/10");
-  });
-
-  test("with no score known, the date stands alone with no stray separator", () => {
-    expect(describeViva(viva(), NOW).detail).toBe("21 Nov");
-    expect(describeViva(viva({ score: null }), NOW).detail).toBe("21 Nov");
-  });
-
   test("a viva that ended early says so and has no report to open", () => {
-    const row = describeViva(viva({ status: "abandoned", score: null }), NOW);
+    const row = describeViva(viva({ status: "abandoned" }), NOW);
 
     expect(row.detail).toBe("21 Nov · Ended early");
     expect(row.hasReport).toBe(false);
@@ -92,7 +83,6 @@ describe("searching", () => {
       viva_session_id: "c",
       title: "Nationalism in India",
       topic: "Nationalism in India",
-      subject_name: "History",
     }),
   ];
   const found = (typed: string) =>
@@ -104,10 +94,6 @@ describe("searching", () => {
 
   test("matches the chapter even after a rename", () => {
     expect(found("metal")).toEqual(["b"]);
-  });
-
-  test("matches the subject", () => {
-    expect(found("history")).toEqual(["c"]);
   });
 
   test("nothing typed finds nothing, not everything", () => {

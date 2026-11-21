@@ -112,10 +112,6 @@ export interface VivaSessionSummary {
   started_at: string;
   session_type: string;
   status: string;
-  /** Out of ten. Missing until the viva has a report. */
-  score?: number | null;
-  /** The subject the chapter belongs to, when it was chosen from the catalogue. */
-  subject_name?: string | null;
 }
 
 export interface HistoryResponse {

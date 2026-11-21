@@ -4,7 +4,7 @@ import type { VivaSessionSummary } from "@/types/viva";
 export type VivaRow = {
   id: string;
   title: string;
-  /** The small line under the title: when, and how it went. */
+  /** The small line under the title: when, and whether it was cut short. */
   detail: string;
   /** Only a finished viva has a report to open. */
   hasReport: boolean;
@@ -29,10 +29,16 @@ export function formatVivaDate(startedAt: string, now = new Date()): string {
   return format.format(date);
 }
 
+/**
+ * Only said when there is no report to open. A finished viva shows no score
+ * here: a number beside each chapter turns the list into a ranking, and a
+ * score is not a verdict. It belongs in the report, next to what went well
+ * and what to work on.
+ */
 function outcome(viva: VivaSessionSummary): string | null {
   if (viva.status === "abandoned") return "Ended early";
   if (viva.status === "in_progress") return "In progress";
-  return typeof viva.score === "number" ? `${viva.score}/10` : null;
+  return null;
 }
 
 export function describeViva(
@@ -49,7 +55,7 @@ export function describeViva(
   };
 }
 
-/** The vivas whose name, chapter or subject contains what was typed. */
+/** The vivas whose name or chapter contains what was typed. */
 export function searchVivas(
   vivas: readonly VivaSessionSummary[],
   typed: string,
@@ -57,7 +63,7 @@ export function searchVivas(
   const wanted = typed.trim().toLowerCase();
   if (!wanted) return [];
   return vivas.filter((viva) =>
-    [viva.title, viva.topic, viva.subject_name ?? ""].some((text) =>
+    [viva.title, viva.topic].some((text) =>
       text.toLowerCase().includes(wanted),
     ),
   );

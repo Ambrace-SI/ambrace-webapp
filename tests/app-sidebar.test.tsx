@@ -117,8 +117,8 @@ function viva(
 
 const NEWEST: HistoryResponse = {
   sessions: [
-    viva("a", "Electricity", { score: 7 }),
-    viva("b", "Metals and Non-metals", { score: 4 }),
+    viva("a", "Electricity"),
+    viva("b", "Metals and Non-metals"),
     viva("c", "Motion", { status: "abandoned" }),
   ],
   next_cursor: null,
@@ -252,13 +252,13 @@ describe("the frame around every page", () => {
 });
 
 describe("the list of past vivas", () => {
-  test("a finished viva links to its report and shows when and how it went", async () => {
+  test("a finished viva links to its report and shows when it was, with no score", async () => {
     renderShell();
 
     const link = await row(/Electricity/);
 
     expect(link.getAttribute("href")).toBe("/v/a");
-    expect(link.textContent).toMatch(/Electricity21 Nov.*7\/10/);
+    expect(link.textContent).toMatch(/^Electricity21 Nov( \d{4})?$/);
   });
 
   test("a viva that ended early is listed, but leads nowhere", async () => {

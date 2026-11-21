@@ -20,7 +20,7 @@ import { useHistory } from "@/lib/hooks/use-history";
 const RECENT = 5;
 
 /**
- * Find a report by chapter, subject or the name it was given.
+ * Find a report by chapter or by the name it was given.
  *
  * It looks through the vivas already loaded in the side panel. When there are
  * older ones still on the server it says so and offers to fetch them, instead
@@ -63,7 +63,7 @@ export function SearchDialog({
       <DialogContent className="top-[18%] translate-y-0 gap-0 overflow-hidden p-0">
         <DialogTitle className="sr-only">Search your vivas</DialogTitle>
         <DialogDescription className="sr-only">
-          Type a chapter or subject. Press Enter to open the first match.
+          Type a chapter. Press Enter to open the first match.
         </DialogDescription>
 
         <form
