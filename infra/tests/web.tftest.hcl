@@ -178,6 +178,19 @@ run "the_content_security_policy_starts_as_report_only" {
     condition     = strcontains(output.expected_headers["permissions-policy"], "microphone=(self)")
     error_message = "A viva needs the microphone."
   }
+
+  assert {
+    condition = contains(
+      [for item in aws_cloudfront_response_headers_policy.site.custom_headers_config[0].items : item.header],
+      "content-security-policy-report-only",
+    )
+    error_message = "The report-only policy is sent as a custom header."
+  }
+
+  assert {
+    condition     = length(aws_cloudfront_response_headers_policy.site.security_headers_config[0].content_security_policy) == 0
+    error_message = "While report-only, the enforcing setting must be absent."
+  }
 }
 
 run "the_content_security_policy_can_be_enforced" {
@@ -195,6 +208,21 @@ run "the_content_security_policy_can_be_enforced" {
   assert {
     condition     = !contains(keys(output.expected_headers), "content-security-policy-report-only")
     error_message = "Report-only and enforced must not both be sent."
+  }
+
+  # CloudFront refuses content-security-policy as a custom header. The mock
+  # provider does not know that, so the shape is pinned here.
+  assert {
+    condition = alltrue([
+      for item in aws_cloudfront_response_headers_policy.site.custom_headers_config[0].items :
+      !startswith(item.header, "content-security-policy")
+    ])
+    error_message = "When enforcing, no content security policy may be sent as a custom header."
+  }
+
+  assert {
+    condition     = aws_cloudfront_response_headers_policy.site.security_headers_config[0].content_security_policy[0].content_security_policy == output.expected_headers["content-security-policy"]
+    error_message = "When enforcing, the policy goes in CloudFront's own content security policy setting."
   }
 }
 
