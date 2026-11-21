@@ -67,6 +67,18 @@ resource "aws_cloudfront_response_headers_policy" "site" {
       referrer_policy = local.headers["referrer-policy"]
       override        = true
     }
+
+    # CloudFront only accepts the enforcing header here. Sent as a custom
+    # header it is refused ("a security header ... cannot be set as custom
+    # header"); the report-only form, below, is the other way round.
+    dynamic "content_security_policy" {
+      for_each = var.enforce_content_security_policy ? [local.content_security_policy] : []
+
+      content {
+        content_security_policy = content_security_policy.value
+        override                = true
+      }
+    }
   }
 
   # "Server: AmazonS3" tells a visitor what is behind CloudFront for no benefit.
@@ -82,10 +94,14 @@ resource "aws_cloudfront_response_headers_policy" "site" {
       value    = local.headers["permissions-policy"]
       override = true
     }
-    items {
-      header   = local.content_security_policy_header
-      value    = local.content_security_policy
-      override = true
+    dynamic "items" {
+      for_each = var.enforce_content_security_policy ? [] : [local.content_security_policy]
+
+      content {
+        header   = "content-security-policy-report-only"
+        value    = items.value
+        override = true
+      }
     }
   }
 }
