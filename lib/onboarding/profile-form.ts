@@ -3,11 +3,13 @@ import {
   MAX_CLASS_LEVEL,
   MIN_CLASS_LEVEL,
   type Board,
+  type Profile,
   type ProfileUpdate,
 } from "@/types/profile";
 
 /**
- * Onboarding rules, checked in the browser so a student hears about a problem
+ * The rules a profile must meet, at onboarding and whenever it is edited in
+ * Settings. They are checked in the browser so a student hears about a problem
  * next to the field, before anything is sent. The backend applies the same
  * rules again and has the final say.
  */
@@ -31,6 +33,17 @@ export const EMPTY_DRAFT: ProfileDraft = {
   schoolName: "",
   schoolAddress: "",
 };
+
+/** A saved profile, laid out the way the forms hold it while it is edited. */
+export function draftFromProfile(profile: Profile): ProfileDraft {
+  return {
+    name: profile.name,
+    classLevel: profile.class_level,
+    board: profile.board,
+    schoolName: profile.school_name ?? "",
+    schoolAddress: profile.school_address ?? "",
+  };
+}
 
 export type ProfileErrors = Partial<
   Record<"name" | "classLevel" | "schoolName" | "schoolAddress", string>

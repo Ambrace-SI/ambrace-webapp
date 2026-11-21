@@ -1,6 +1,11 @@
 "use client";
 
-import { ChevronsUpDownIcon, Loader2Icon, LogOutIcon } from "lucide-react";
+import {
+  ChevronsUpDownIcon,
+  Loader2Icon,
+  LogOutIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -18,17 +23,19 @@ import {
 } from "@/components/ui/sidebar";
 import { leaveAmbrace } from "@/lib/app/sign-out";
 import { useMe } from "@/lib/hooks/use-me";
+import { settingsWindow } from "@/lib/settings/settings-window";
 import { BOARD_LABELS } from "@/types/profile";
 
 /**
- * Who is signed in, at the foot of the side panel, and the way out.
+ * Who is signed in, at the foot of the side panel, with the way to their
+ * settings and the way out.
  *
  * Signing out sits one step away, inside a menu, so it is never pressed by a
  * thumb reaching for something else.
  */
 export function AccountMenu() {
   const { data: me } = useMe();
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const [leaving, setLeaving] = useState(false);
 
   const profile = me?.profile;
@@ -76,6 +83,16 @@ export function AccountMenu() {
             align="end"
             className="w-56"
           >
+            <DropdownMenuItem
+              onSelect={() => {
+                // On a phone the drawer would sit on top of Settings.
+                setOpenMobile(false);
+                settingsWindow.open();
+              }}
+            >
+              <SettingsIcon aria-hidden="true" />
+              Settings
+            </DropdownMenuItem>
             <DropdownMenuItem
               disabled={leaving}
               onSelect={(event) => {

@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { Logo } from "@/components/brand/logo";
+import { SettingsWindow } from "@/components/settings/settings-window";
 import {
   SidebarInset,
   SidebarProvider,
@@ -61,6 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </WholeScreenContext>
         </SidebarInset>
       </SidebarProvider>
+      {/* Settings opens over any page, but never over a viva in progress. */}
+      {wholeScreen ? null : <SettingsWindow />}
       <Toaster />
     </TooltipProvider>
   );

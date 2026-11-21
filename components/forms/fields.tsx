@@ -62,6 +62,40 @@ export function TextField({
   );
 }
 
+/** A labelled box for a few lines of text, such as an address. */
+export function TextAreaField({
+  label,
+  error,
+  optional = false,
+  className,
+  ...props
+}: ComponentProps<"textarea"> & {
+  label: string;
+  error?: string;
+  optional?: boolean;
+}) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-2">
+      <FieldLabel htmlFor={id} optional={optional}>
+        {label}
+      </FieldLabel>
+      <textarea
+        id={id}
+        rows={3}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={cn(
+          "w-full resize-none rounded-lg border border-input bg-transparent px-3.5 py-2.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20",
+          className,
+        )}
+        {...props}
+      />
+      <FieldError id={`${id}-error`} message={error} />
+    </div>
+  );
+}
+
 /** A password field with a show/hide switch, so a typo is easy to spot. */
 export function PasswordField({
   label,
