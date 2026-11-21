@@ -8,7 +8,7 @@ import { Orbit } from "@/components/brand/orbit";
 import { Button } from "@/components/ui/button";
 import { isSignedOutError } from "@/lib/api/errors";
 import { configureAuth } from "@/lib/auth/client";
-import { ONBOARDING_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
+import { ONBOARDING_PATH, signInUrlFor } from "@/lib/auth/routes";
 import { useMe } from "@/lib/hooks/use-me";
 
 /**
@@ -39,11 +39,13 @@ export function SessionGate({
 
   useEffect(() => {
     if (!signedOut) return;
-    // The backend no longer accepts this session. Clear it and start again.
+    // Nobody is signed in, or the backend no longer accepts this session.
+    // Clear what is left and start again, remembering where they were going.
+    const { pathname, search } = window.location;
     configureAuth();
     void signOut()
       .catch(() => undefined)
-      .finally(() => window.location.replace(SIGN_IN_PATH));
+      .finally(() => window.location.replace(signInUrlFor(pathname, search)));
   }, [signedOut]);
 
   useEffect(() => {

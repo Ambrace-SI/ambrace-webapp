@@ -5,6 +5,15 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // CloudFront Functions are plain scripts, not modules: CloudFront calls the
+  // top-level `handler`, which each file marks with an `exported` comment.
+  {
+    files: ["infra/functions/**/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      parserOptions: { sourceType: "script" },
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

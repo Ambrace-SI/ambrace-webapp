@@ -6,7 +6,12 @@ and read the report. Nothing is public; every page sits behind sign-in.
 ## Stack
 
 Next.js 16.4 (App Router), React 19.3, TypeScript, Tailwind CSS v4, shadcn/ui
-(Radix base). Hosted on Vercel. The backend is `ambrace-backend`.
+(Radix base). The backend is `ambrace-backend`.
+
+The app is a static site: `npm run build` writes plain files to `out/`, which
+are stored in S3 and served by CloudFront. There is no Next.js server in dev or
+prod, so nothing here may rely on one (no Proxy, no route handlers, no page per
+record). Hosting and deployment are described in `infra/README.md`.
 
 ## Run locally
 
@@ -14,6 +19,13 @@ Next.js 16.4 (App Router), React 19.3, TypeScript, Tailwind CSS v4, shadcn/ui
 cp .env.example .env.local
 npm install
 npm run dev
+```
+
+To see the site exactly as it will be served, build it and serve the files:
+
+```
+npm run build
+npm run preview
 ```
 
 See "Checks" below for the commands CI runs.
@@ -48,12 +60,12 @@ written next to each one).
 | `npm run typecheck`     | TypeScript in strict mode.                           |
 | `npm test`              | Vitest. `npm run test:watch` reruns on save.         |
 | `npm run test:coverage` | Tests plus coverage; fails below the thresholds.     |
-| `npm run build`         | Production build.                                    |
+| `npm run build`         | Builds the static site into `out/`.                  |
 
 CI runs all five on every pull request (`.github/workflows/checks.yml`).
 
 Tests live in `tests/`, named after what they cover. Coverage is measured
-across `app/`, `components/`, `lib/` and `proxy.ts`, and CI fails if it falls
+across `app/`, `components/` and `lib/`, and CI fails if it falls
 below 90% of statements, lines and functions or 80% of branches. Raise those
 numbers as coverage grows; do not lower them to get a change through.
 

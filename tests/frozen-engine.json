@@ -11,7 +11,7 @@
   "lib/hooks/viva/audio-pipeline.ts": "5215f9d81614cf0bc9484d0da9da8bfd1740452c2a8e75ef78a84e086fb4a405",
   "lib/hooks/viva/conclusion-watchdog.ts": "907742bd20954ea52016ef51fa1fccdf69b84ac57657174f471d92a8c4135a59",
   "lib/hooks/viva/live-recovery-handlers.ts": "bd6504a47dde85d45d35b789c9d0c9dff6a46e96b8345a2b08d6612c148a8db0",
-  "lib/hooks/viva/session-lifecycle.ts": "4cf850dabb9de95d6fdc444fb504aeff39696179c88dede8ca9b425cb3de6115",
+  "lib/hooks/viva/session-lifecycle.ts": "864e9d6453fed094b251b67a018b1461778e92deedeac2f61b467cbbd0e06721",
   "lib/hooks/viva/session-startup.ts": "b008e6ff327d6141bc7ebf7cf4abfb375793445a571d9e9b6830e7460821b88c",
   "lib/hooks/viva/tool-handlers.ts": "26da5b5ca7870a51c69ef6603df8952eb281eee597f65530ce7f3288a1704b29",
   "lib/store/viva-store.ts": "04073c083d2b2214245dd65b7c452ff76c7a46fc84be31848249b43d42726048",

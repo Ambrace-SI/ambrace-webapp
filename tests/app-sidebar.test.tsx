@@ -55,11 +55,13 @@ vi.mock("next/image", () => ({
 
 const address = vi.hoisted(() => ({
   pathname: "/",
+  search: "",
   push: vi.fn(),
   replace: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => address.pathname,
+  useSearchParams: () => new URLSearchParams(address.search),
   useRouter: () => ({ push: address.push, replace: address.replace }),
 }));
 
@@ -193,6 +195,7 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   panelPreference.remember(true);
   address.pathname = "/";
+  address.search = "";
   address.push.mockReset();
   address.replace.mockReset();
   leaveAmbrace.mockReset();
@@ -375,7 +378,7 @@ describe("the list of past vivas", () => {
 
     const link = await row(/Electricity/);
 
-    expect(link.getAttribute("href")).toBe("/v/a");
+    expect(link.getAttribute("href")).toBe("/v?id=a");
     expect(link.textContent).toMatch(/^Electricity21 Nov( \d{4})?$/);
   });
 
@@ -409,7 +412,8 @@ describe("the list of past vivas", () => {
   });
 
   test("the report on screen is marked as the current one", async () => {
-    address.pathname = "/v/b";
+    address.pathname = "/v";
+    address.search = "id=b";
     renderShell();
 
     expect((await row(/Metals/)).getAttribute("aria-current")).toBe("page");
@@ -417,7 +421,8 @@ describe("the list of past vivas", () => {
   });
 
   test("the row under the pointer is highlighted, except the current one", async () => {
-    address.pathname = "/v/b";
+    address.pathname = "/v";
+    address.search = "id=b";
     const { container } = renderShell();
     const glide = () => container.querySelector("li > span[aria-hidden]");
     const item = (link: HTMLElement) => link.closest("li")!;
@@ -698,7 +703,8 @@ describe("deleting a viva", () => {
   });
 
   test("deleting the report on screen goes home, not to a missing page", async () => {
-    address.pathname = "/v/a";
+    address.pathname = "/v";
+    address.search = "id=a";
     await askToDelete();
 
     await press("Delete");
@@ -750,7 +756,7 @@ describe("searching", () => {
     await openSearch();
 
     expect(screen.getByText("Recent")).toBeTruthy();
-    expect(results()).toEqual(["/v/a", "/v/b"]);
+    expect(results()).toEqual(["/v?id=a", "/v?id=b"]);
   });
 
   test("typing narrows the list to what matches", async () => {
@@ -759,7 +765,7 @@ describe("searching", () => {
     await userEvent.setup().type(field, "metal");
 
     expect(screen.getByText("Matches")).toBeTruthy();
-    expect(results()).toEqual(["/v/b"]);
+    expect(results()).toEqual(["/v?id=b"]);
   });
 
   test("Enter opens the first match and closes search", async () => {
@@ -767,7 +773,7 @@ describe("searching", () => {
 
     await userEvent.setup().type(field, "metal{Enter}");
 
-    expect(address.push).toHaveBeenCalledWith("/v/b");
+    expect(address.push).toHaveBeenCalledWith("/v?id=b");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
@@ -847,7 +853,7 @@ describe("searching", () => {
     ).toBe(true);
     arrive({ sessions: [viva("z", "Sound")], next_cursor: null });
 
-    await waitFor(() => expect(results()).toEqual(["/v/z"]));
+    await waitFor(() => expect(results()).toEqual(["/v?id=z"]));
   });
 
   test("before the first viva, it says reports will appear here", async () => {

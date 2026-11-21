@@ -23,7 +23,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text-summary", "html"],
       // Everything we ship. Files with no test at all still count, as zero.
-      include: ["app/**", "components/**", "lib/**", "proxy.ts"],
+      include: ["app/**", "components/**", "lib/**"],
       // CI fails if coverage falls below these. Raise them as coverage grows;
       // never lower them to make a change pass.
       thresholds: {

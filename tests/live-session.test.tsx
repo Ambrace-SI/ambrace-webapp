@@ -281,7 +281,7 @@ describe("before and after the conversation", () => {
       screen
         .getByRole("link", { name: "See the full report" })
         .getAttribute("href"),
-    ).toBe("/v/session-1");
+    ).toBe("/v?id=session-1");
     expect(screen.getByRole("link", { name: "Back to home" })).toBeTruthy();
     // The controls and the clock are gone: there is nothing left to control.
     expect(screen.queryByRole("button")).toBeNull();

@@ -25,6 +25,9 @@ vi.mock("@/components/auth/auth-shell", () => ({
     <div data-frame="signed-out">{children}</div>
   ),
 }));
+vi.mock("@/components/auth/signed-out-only", () => ({
+  SignedOutOnly: () => <span data-gate="signed-out-only" />,
+}));
 vi.mock("@/components/onboarding/onboarding-flow", () => ({
   OnboardingFlow: () => <p>onboarding</p>,
 }));
@@ -77,9 +80,10 @@ describe("signed-out addresses", () => {
       </AuthLayout>,
     );
 
-    expect(
-      container.querySelector('[data-frame="signed-out"]')?.textContent,
-    ).toBe("a screen");
+    const frame = container.querySelector('[data-frame="signed-out"]');
+    expect(frame?.textContent).toBe("a screen");
+    // No server turns signed-in people away any more; this does.
+    expect(frame?.querySelector('[data-gate="signed-out-only"]')).toBeTruthy();
   });
 });
 
@@ -108,7 +112,7 @@ describe("signed-in addresses", () => {
   });
 
   test("a report sits inside the app", async () => {
-    const page = await import("@/app/(app)/v/[id]/page");
+    const page = await import("@/app/(app)/v/page");
 
     render(<page.default />);
 
@@ -123,21 +127,6 @@ describe("signed-in addresses", () => {
 
     expect(page.metadata.title).toBe("Viva");
     expect(screen.getByText("viva room")).toBeTruthy();
-  });
-
-  test("an address nobody claims is answered inside the app as not found", async () => {
-    const { default: UnknownAddress } =
-      await import("@/app/(app)/[...rest]/page");
-
-    let thrown: unknown;
-    try {
-      UnknownAddress();
-    } catch (error) {
-      thrown = error;
-    }
-
-    // Next reads this mark and shows the nearest not-found page: the app's.
-    expect((thrown as { digest?: string }).digest).toMatch(/404/);
   });
 
   test("onboarding only needs a session, or it would redirect to itself", async () => {

@@ -311,8 +311,7 @@ describe("narrowing the focus", () => {
   });
 
   test("no more than twenty topics of the student's own", async () => {
-    // Sixty-odd presses: without a pause between each this stays well inside
-    // the time limit even when the whole suite runs at once.
+    // Sixty-odd presses, so no pause between each.
     const user = userEvent.setup({ delay: null });
     renderSetup();
     await chooseCellChapter(user);
@@ -331,7 +330,9 @@ describe("narrowing the focus", () => {
     expect(
       focus().queryByRole("checkbox", { name: "One too many" }),
     ).toBeNull();
-  });
+    // The longest test in the suite by far. With every file running at once
+    // it takes about as long as the default limit, so it has its own.
+  }, 20_000);
 });
 
 describe("when the subject list will not load", () => {

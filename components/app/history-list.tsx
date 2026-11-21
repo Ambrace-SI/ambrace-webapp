@@ -3,7 +3,7 @@
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -31,6 +31,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { HOME_PATH, reportPath } from "@/lib/auth/routes";
+import { useOpenReportId } from "@/lib/hooks/use-open-report";
 import { describeViva, type VivaRow } from "@/lib/history/describe";
 import {
   useDeleteViva,
@@ -56,7 +57,7 @@ export function HistoryList({ onNavigate }: { onNavigate: () => void }) {
   const history = useHistory();
   const rename = useRenameViva();
   const remove = useDeleteViva();
-  const pathname = usePathname();
+  const openReportId = useOpenReportId();
   const router = useRouter();
   const stillMotion = useReducedMotion();
 
@@ -80,7 +81,7 @@ export function HistoryList({ onNavigate }: { onNavigate: () => void }) {
       onError: () => toast.error("Couldn't delete that viva. Try again."),
     });
     // The report on screen is the one being deleted: leave it.
-    if (pathname === reportPath(row.id)) router.replace(HOME_PATH);
+    if (openReportId === row.id) router.replace(HOME_PATH);
   }
 
   return (
@@ -89,7 +90,7 @@ export function HistoryList({ onNavigate }: { onNavigate: () => void }) {
       <ListBody
         history={history}
         renderRow={(row) => {
-          const open = pathname === reportPath(row.id);
+          const open = openReportId === row.id;
           return (
             <SidebarMenuItem
               key={row.id}
