@@ -2,6 +2,7 @@
 
 import { HistoryIcon, PlusIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { AccountMenu } from "@/components/app/account-menu";
@@ -68,16 +69,10 @@ export function AppSidebar() {
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="New viva"
-              className="font-medium"
-            >
-              <Link href={VIVA_PATH} onClick={closeDrawer}>
-                <PlusIcon aria-hidden="true" />
-                <SidebarMenuLabel>New viva</SidebarMenuLabel>
-              </Link>
-            </SidebarMenuButton>
+            {/* Which page is open is only known in the browser. */}
+            <Suspense fallback={<NewVivaRow onNavigate={closeDrawer} />}>
+              <NewVivaRowForThisPage onNavigate={closeDrawer} />
+            </Suspense>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -125,4 +120,37 @@ export function AppSidebar() {
       />
     </Sidebar>
   );
+}
+
+/** A plain row, not the warm button: each page has one of those already. */
+function NewVivaRow({
+  current = false,
+  onNavigate,
+}: {
+  current?: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <SidebarMenuButton
+      asChild
+      isActive={current}
+      tooltip="New viva"
+      className="font-medium"
+    >
+      <Link
+        href={VIVA_PATH}
+        aria-current={current ? "page" : undefined}
+        onClick={onNavigate}
+      >
+        <PlusIcon aria-hidden="true" />
+        <SidebarMenuLabel>New viva</SidebarMenuLabel>
+      </Link>
+    </SidebarMenuButton>
+  );
+}
+
+/** The same row, marked when the student is already choosing a viva. */
+function NewVivaRowForThisPage({ onNavigate }: { onNavigate: () => void }) {
+  const current = usePathname() === VIVA_PATH;
+  return <NewVivaRow current={current} onNavigate={onNavigate} />;
 }

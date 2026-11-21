@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -16,6 +16,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { HistoryOutline } from "@/components/app/history-list";
 import { useSidebar } from "@/components/ui/sidebar";
 import { panelPreference } from "@/lib/app/panel-preference";
+import { useWholeScreen } from "@/lib/app/whole-screen";
 import type { Me } from "@/types/profile";
 import type { HistoryResponse, VivaSessionSummary } from "@/types/viva";
 
@@ -249,6 +250,121 @@ describe("the frame around every page", () => {
     const Lost = () => <p>{useSidebar().state}</p>;
 
     expect(() => render(<Lost />)).toThrow(/within a SidebarProvider/);
+  });
+});
+
+describe("the page the student is on", () => {
+  const newViva = () => screen.getByRole("link", { name: "New viva" });
+
+  test("New viva is marked while a viva is being chosen", () => {
+    address.pathname = "/viva";
+    renderShell();
+
+    expect(newViva().getAttribute("aria-current")).toBe("page");
+    expect(newViva().getAttribute("data-active")).toBe("true");
+  });
+
+  test("and is not marked anywhere else", () => {
+    renderShell();
+
+    expect(newViva().getAttribute("aria-current")).toBeNull();
+    expect(newViva().getAttribute("data-active")).toBe("false");
+  });
+});
+
+describe("a page that needs the whole screen", () => {
+  let built = 0;
+  beforeEach(() => {
+    built = 0;
+  });
+
+  /** Stands in for the viva room: a setup screen, then a live one. */
+  function Room() {
+    const [live, setLive] = useState(false);
+    // Counts how often the page is built from nothing.
+    useState(() => built++);
+    useWholeScreen(live);
+    return (
+      <button onClick={() => setLive(!live)}>
+        {live ? "end the viva" : "begin the viva"}
+      </button>
+    );
+  }
+
+  function renderRoom() {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    client.setQueryData(["me"], ME);
+    const page = (room: boolean) => (
+      <QueryClientProvider client={client}>
+        <AppShell>{room ? <Room /> : <p>another page</p>}</AppShell>
+      </QueryClientProvider>
+    );
+    const view = render(page(true));
+    return { leave: () => view.rerender(page(false)) };
+  }
+
+  test("has the panel beside it until it asks", () => {
+    renderRoom();
+
+    expect(screen.getByRole("navigation")).toBeTruthy();
+  });
+
+  test("asking puts the panel away, and handing the screen back returns it", async () => {
+    renderRoom();
+
+    await press("begin the viva");
+
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("link", { name: "New viva" })).toBeNull();
+
+    await press("end the viva");
+
+    expect(screen.getByRole("navigation")).toBeTruthy();
+  });
+
+  test("the page is never built again when the panel goes or comes back", async () => {
+    // Building it again would throw away a viva that had just begun.
+    renderRoom();
+
+    await press("begin the viva");
+    await press("end the viva");
+
+    expect(built).toBe(1);
+  });
+
+  test("leaving the page hands the screen back by itself", async () => {
+    const room = renderRoom();
+    await press("begin the viva");
+
+    room.leave();
+
+    expect(screen.getByText("another page")).toBeTruthy();
+    expect(screen.getByRole("navigation")).toBeTruthy();
+  });
+
+  test("with the panel away, search cannot be opened from the keyboard", async () => {
+    renderRoom();
+    await press("begin the viva");
+
+    await userEvent.setup().keyboard("{Control>}k{/Control}");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("on a phone, the bar that opens the drawer goes too", async () => {
+    onScreen("phone");
+    renderRoom();
+    expect(
+      screen.getByRole("button", { name: "Open the side panel" }),
+    ).toBeTruthy();
+
+    await press("begin the viva");
+
+    expect(
+      screen.queryByRole("button", { name: "Open the side panel" }),
+    ).toBeNull();
   });
 });
 
@@ -616,6 +732,18 @@ describe("searching", () => {
       .getAllByRole("link")
       .filter((link) => link.closest("[role=dialog]"))
       .map((link) => link.getAttribute("href"));
+
+  test("while closed it does not ask for the list; opening it does", async () => {
+    // Asking early would fetch the list before the panel is ready to show
+    // it, and the page would then disagree with what the server sent.
+    panelPreference.remember(false);
+    renderShell();
+    expect(api.getHistory).not.toHaveBeenCalled();
+
+    await press("Search vivas");
+
+    await waitFor(() => expect(api.getHistory).toHaveBeenCalledTimes(1));
+  });
 
   test("opens on the most recent reports, leaving out vivas that have none", async () => {
     await openSearch();

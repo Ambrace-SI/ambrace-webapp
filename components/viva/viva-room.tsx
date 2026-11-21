@@ -1,11 +1,14 @@
 "use client";
 
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { LiveSession, type VivaScope } from "@/components/viva/live-session";
 import { VivaSetup, type VivaChoice } from "@/components/viva/viva-setup";
 import { abandonViva, startVivaSession } from "@/lib/api/axios";
+import { useWholeScreen } from "@/lib/app/whole-screen";
 import { mapVivaRequest } from "@/lib/curriculum/selection";
+import { HISTORY_KEY } from "@/lib/hooks/use-history";
 import { useMe } from "@/lib/hooks/use-me";
 import { useVivaSession } from "@/lib/hooks/useVivaSession";
 import { useVivaStore } from "@/lib/store/viva-store";
@@ -20,21 +23,45 @@ const IN_FLIGHT: ReadonlySet<SessionState> = new Set([
 ]);
 
 /**
+ * The side panel lists every viva and outlives this page, so it is told
+ * whenever one of them stops being what the list last said it was.
+ */
+function refreshHistory(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
+}
+
+/**
+ * Tells the server nobody is in the room. If that fails there is nothing more
+ * to do from here; the list is refreshed either way.
+ */
+function releaseViva(queryClient: QueryClient, sessionId: string) {
+  void abandonViva(sessionId)
+    .catch(() => {})
+    .finally(() => refreshHistory(queryClient));
+}
+
+/**
  * One address, two moments: choosing what to talk about, then talking.
  *
  * They share a page because the live session owns the microphone, the speaker
  * and the connection, and all three must be released the moment the student
  * leaves. Keeping them in one place means leaving the page always cleans up.
+ *
+ * Choosing happens beside the side panel, like any other page. Talking takes
+ * the whole screen, so nothing on it can end the viva by accident.
  */
 export function VivaRoom() {
   const { data: me } = useMe();
   const session = useVivaSession();
+  const queryClient = useQueryClient();
   const [scope, setScope] = useState<VivaScope | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
   // Counts departures, so work begun on one visit cannot finish on the next.
   const visit = useRef(0);
+
+  useWholeScreen(scope !== null);
 
   // Leaving ends the visit, however the student leaves. Next keeps this page
   // alive (hidden) after navigation and hands it back as it was, so without
@@ -46,7 +73,7 @@ export function VivaRoom() {
         useVivaStore.getState();
       // A viva still running has nobody in the room: release it on the server.
       if (sessionId && !conclusionData && IN_FLIGHT.has(sessionState))
-        void abandonViva(sessionId).catch(() => {});
+        releaseViva(queryClient, sessionId);
       useVivaStore.getState().resetSession();
       // When the engine itself sent the student home, the reason goes with them.
       if (error && sessionState === SessionState.IDLE)
@@ -55,7 +82,8 @@ export function VivaRoom() {
       setStarting(false);
       setStartError(null);
     },
-    [],
+    // The same client for as long as the app is open: this runs on leaving only.
+    [queryClient],
   );
 
   const profile = me?.profile;
@@ -74,7 +102,7 @@ export function VivaRoom() {
       );
       if (visit.current !== thisVisit) {
         // The student left while the session was being created.
-        void abandonViva(response.viva_session_id).catch(() => {});
+        releaseViva(queryClient, response.viva_session_id);
         return;
       }
       session.setSessionData(response);
@@ -100,6 +128,8 @@ export function VivaRoom() {
         onChooseAgain={() => {
           session.resetSession();
           setScope(null);
+          // The viva that stopped is in the list, and the list is back.
+          refreshHistory(queryClient);
         }}
       />
     );
@@ -118,7 +148,7 @@ export function VivaRoom() {
 function RoomOutline() {
   return (
     <main
-      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-10 px-6 pt-24 pb-12 sm:px-10"
+      className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 pt-10 pb-12 sm:px-10 sm:pt-14"
       aria-busy="true"
     >
       <p className="sr-only" role="status">

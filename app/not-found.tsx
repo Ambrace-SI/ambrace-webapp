@@ -8,7 +8,11 @@ import { HOME_PATH } from "@/lib/auth/routes";
 
 export const metadata: Metadata = { title: "Page not found" };
 
-/** An address that leads nowhere. */
+/**
+ * The safety net for "not found" raised outside the app frame. A mistyped
+ * address normally lands on the page of the same name inside the frame, where
+ * the side panel is.
+ */
 export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col">

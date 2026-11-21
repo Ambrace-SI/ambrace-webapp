@@ -116,21 +116,28 @@ describe("signed-in addresses", () => {
     expect(screen.getByText("report")).toBeTruthy();
   });
 
-  test("the viva needs a profile but has no side panel to wander off through", async () => {
-    const { default: VivaLayout } = await import("@/app/(viva)/layout");
-    const page = await import("@/app/(viva)/viva/page");
+  test("the viva sits inside the app too, so the side panel stays", async () => {
+    const page = await import("@/app/(app)/viva/page");
 
-    const { container } = render(
-      <VivaLayout>
-        <page.default />
-      </VivaLayout>,
-    );
+    render(<page.default />);
 
     expect(page.metadata.title).toBe("Viva");
-    const gate = container.querySelector("[data-needs]");
-    expect(gate?.getAttribute("data-needs")).toBe("profile");
-    expect(gate?.textContent).toBe("viva room");
-    expect(container.querySelector("[data-frame=app]")).toBeNull();
+    expect(screen.getByText("viva room")).toBeTruthy();
+  });
+
+  test("an address nobody claims is answered inside the app as not found", async () => {
+    const { default: UnknownAddress } =
+      await import("@/app/(app)/[...rest]/page");
+
+    let thrown: unknown;
+    try {
+      UnknownAddress();
+    } catch (error) {
+      thrown = error;
+    }
+
+    // Next reads this mark and shows the nearest not-found page: the app's.
+    expect((thrown as { digest?: string }).digest).toMatch(/404/);
   });
 
   test("onboarding only needs a session, or it would redirect to itself", async () => {

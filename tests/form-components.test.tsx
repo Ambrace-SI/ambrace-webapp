@@ -186,13 +186,13 @@ describe("buttons", () => {
   test("can lend its look to a link", () => {
     render(
       <Button asChild>
-        <a href="/sign-in">Back</a>
+        <a href="#details">Details</a>
       </Button>,
     );
 
     expect(
-      screen.getByRole("link", { name: "Back" }).getAttribute("href"),
-    ).toBe("/sign-in");
+      screen.getByRole("link", { name: "Details" }).getAttribute("href"),
+    ).toBe("#details");
   });
 });
 

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { VivaRoom } from "@/components/viva/viva-room";
 import { APIError } from "@/lib/api/axios";
+import { WholeScreenContext } from "@/lib/app/whole-screen";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaStore } from "@/lib/store/viva-store";
 import type { Me } from "@/types/profile";
@@ -103,15 +104,23 @@ const ME: Me = {
   },
 };
 
+/** What the room asked of the frame around it, in order. */
+const wholeScreen = vi.fn();
+/** Each time the side panel's list was told to fetch itself again. */
+let listRefreshed: ReturnType<typeof vi.spyOn>;
+
 function renderRoom(me: Me | null = ME) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   if (me) client.setQueryData(["me"], me);
+  listRefreshed = vi.spyOn(client, "invalidateQueries");
 
   return render(
     <QueryClientProvider client={client}>
-      <VivaRoom />
+      <WholeScreenContext value={wholeScreen}>
+        <VivaRoom />
+      </WholeScreenContext>
     </QueryClientProvider>,
   );
 }
@@ -125,6 +134,7 @@ beforeEach(() => {
   startVivaSession.mockResolvedValue({ viva_session_id: "session-1" });
   abandonViva.mockReset();
   abandonViva.mockResolvedValue({ status: "abandoned" });
+  wholeScreen.mockReset();
   useVivaStore.getState().resetSession();
   for (const mock of Object.values(engine)) mock.mockClear();
 });
@@ -214,6 +224,56 @@ describe("starting a viva", () => {
   });
 });
 
+describe("the side panel around the room", () => {
+  test("stays while the student is choosing", () => {
+    renderRoom();
+
+    expect(wholeScreen).not.toHaveBeenCalled();
+  });
+
+  test("is still there while the session is being created", async () => {
+    startVivaSession.mockReturnValue(new Promise(() => undefined));
+    renderRoom();
+
+    await pressStart();
+    await screen.findByText("starting");
+
+    expect(wholeScreen).not.toHaveBeenCalled();
+  });
+
+  test("is put away for the viva itself", async () => {
+    renderRoom();
+
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    expect(wholeScreen.mock.calls).toEqual([[true]]);
+  });
+
+  test("comes back when the student returns to choosing, with its list refreshed", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "choose again" }));
+
+    expect(wholeScreen.mock.calls).toEqual([[true], [false]]);
+    expect(listRefreshed).toHaveBeenCalledWith({ queryKey: ["history"] });
+  });
+
+  test("comes back when the student leaves in the middle of a viva", async () => {
+    const view = renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    view.unmount();
+
+    expect(wholeScreen.mock.calls).toEqual([[true], [false]]);
+  });
+});
+
 describe("after a viva that broke", () => {
   test("starting again clears the session and returns to choosing", async () => {
     renderRoom();
@@ -281,6 +341,10 @@ describe("leaving the page", () => {
 
     expect(abandonViva).toHaveBeenCalledWith("session-1");
     expect(useVivaStore.getState().sessionId).toBeNull();
+    // Once the server knows, the side panel's list is fetched again.
+    await waitFor(() =>
+      expect(listRefreshed).toHaveBeenCalledWith({ queryKey: ["history"] }),
+    );
   });
 
   test("a viva whose report is saved is left as it is", async () => {
@@ -302,6 +366,7 @@ describe("leaving the page", () => {
 
     expect(() => view.unmount()).not.toThrow();
     expect(useVivaStore.getState().sessionState).toBe(SessionState.IDLE);
+    await waitFor(() => expect(listRefreshed).toHaveBeenCalled());
   });
 
   test("when the engine sends the student home, the reason goes with them", async () => {

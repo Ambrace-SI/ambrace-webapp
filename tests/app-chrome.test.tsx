@@ -54,6 +54,23 @@ describe("a wrong address", () => {
   });
 });
 
+describe("a wrong address, for someone signed in", () => {
+  test("says the same, and leaves the logo to the side panel around it", async () => {
+    const page = await import("@/app/(app)/not-found");
+
+    render(<page.default />);
+
+    expect(page.metadata.title).toBe("Page not found");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "This page doesn't exist",
+    );
+    expect(
+      screen.getByRole("link", { name: "Go to Home" }).getAttribute("href"),
+    ).toBe("/");
+    expect(screen.queryByRole("link", { name: "Ambrace" })).toBeNull();
+  });
+});
+
 describe("a page that breaks", () => {
   let logged: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {

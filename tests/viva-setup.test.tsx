@@ -205,12 +205,10 @@ describe("starting", () => {
     );
   });
 
-  test("there is a way back home", async () => {
+  test("it carries no way home of its own: the side panel around it is that", async () => {
     renderSetup();
 
-    expect(
-      screen.getByRole("link", { name: "Home" }).getAttribute("href"),
-    ).toBe("/");
+    expect(screen.queryByRole("link")).toBeNull();
   });
 });
 
