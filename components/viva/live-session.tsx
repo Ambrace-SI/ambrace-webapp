@@ -10,6 +10,7 @@ import { SessionClock } from "@/components/viva/session-clock";
 import { VoiceOrb } from "@/components/viva/voice-orb";
 import { Button } from "@/components/ui/button";
 import { HOME_PATH, reportPath } from "@/lib/auth/routes";
+import { HISTORY_KEY } from "@/lib/hooks/use-history";
 import { useMicrophoneUnheard } from "@/lib/hooks/use-microphone-unheard";
 import type { useVivaSession } from "@/lib/hooks/useVivaSession";
 import { MOMENT_LABELS, liveMoment } from "@/lib/viva/live-state";
@@ -22,9 +23,10 @@ export type VivaScope = { subject: string; chapter: string };
  * The viva itself.
  *
  * The screen is Ink and almost empty on purpose: this is a conversation, and
- * the student should be listening and speaking, not reading. There is no site
- * header and no way to wander off by accident. Two controls only: mute, and
- * finish. Everything else on screen answers one question: whose turn is it?
+ * the student should be listening and speaking, not reading. The side panel
+ * is put away, so there is no way to wander off by accident. Two controls
+ * only: mute, and finish. Everything else on screen answers one question:
+ * whose turn is it?
  */
 export function LiveSession({
   session,
@@ -45,7 +47,7 @@ export function LiveSession({
   // A finished viva belongs in the history list straight away.
   useEffect(() => {
     if (moment === "completed")
-      void queryClient.invalidateQueries({ queryKey: ["history"] });
+      void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
   }, [moment, queryClient]);
 
   const ended = moment === "completed" || moment === "error";

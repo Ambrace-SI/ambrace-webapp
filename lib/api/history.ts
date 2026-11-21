@@ -1,38 +1,30 @@
 import api from "@/lib/api/axios";
-import { HistoryResponse } from "@/types/viva";
+import type { HistoryResponse } from "@/types/viva";
+
+/** How many vivas one request brings back. */
+export const HISTORY_PAGE_SIZE = 20;
 
 /**
- * History service for managing viva session history.
- *
- * Note: getHistory no longer requires userId - the server extracts
- * the user identity from the JWT token in the Authorization header.
+ * One page of the student's vivas, newest first. The server knows whose they
+ * are from the access token. The cursor is the server's own and is passed
+ * back untouched.
  */
-export const historyService = {
-  /**
-   * Get the authenticated user's viva history.
-   * The server identifies the user from the JWT token.
-   */
-  getHistory: async (cursor?: string): Promise<HistoryResponse> => {
-    // Pass the server cursor unchanged; never infer an offset or owner from it.
-    const response = await api.get<HistoryResponse>("/api/v1/viva/history", {
-      params: { limit: 20, cursor },
-    });
-    return response.data;
-  },
+export async function getHistory(cursor?: string): Promise<HistoryResponse> {
+  const response = await api.get<HistoryResponse>("/api/v1/viva/history", {
+    params: { limit: HISTORY_PAGE_SIZE, cursor },
+  });
+  return response.data;
+}
 
-  /**
-   * Rename a viva session.
-   */
-  renameSession: async (sessionId: string, newTitle: string): Promise<void> => {
-    await api.patch(`/api/v1/viva/${sessionId}/rename`, {
-      new_title: newTitle,
-    });
-  },
+/** Changes the name a viva is listed under. Its chapter stays as it was. */
+export async function renameViva(
+  sessionId: string,
+  title: string,
+): Promise<void> {
+  await api.patch(`/api/v1/viva/${sessionId}/rename`, { new_title: title });
+}
 
-  /**
-   * Delete a viva session.
-   */
-  deleteSession: async (sessionId: string): Promise<void> => {
-    await api.delete(`/api/v1/viva/${sessionId}`);
-  },
-};
+/** Removes a viva and its report for good. */
+export async function deleteViva(sessionId: string): Promise<void> {
+  await api.delete(`/api/v1/viva/${sessionId}`);
+}

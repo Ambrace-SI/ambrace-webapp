@@ -12,7 +12,7 @@ import { BOARD_LABELS } from "@/types/profile";
 
 /**
  * The signed-in home. One thing to do here, so one thing is offered: start a
- * viva. Past sessions will join it below.
+ * viva. Past vivas are in the side panel, on every page.
  */
 export function Home() {
   const { data: me } = useMe();

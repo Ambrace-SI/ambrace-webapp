@@ -1,13 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon, Loader2Icon, PlusIcon } from "lucide-react";
-import Link from "next/link";
+import { Loader2Icon, PlusIcon } from "lucide-react";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { HOME_PATH } from "@/lib/auth/routes";
 import { ENTIRE_CHAPTER, validCustomTopic } from "@/lib/curriculum/selection";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
@@ -26,7 +24,8 @@ const MAX_OWN_TOPICS = 20;
  * the one before it is answered: subject, then chapter, then how much of it.
  * Nothing is hidden behind a dropdown, because on a phone every hidden option
  * costs a tap and a scroll. Name and class are not asked: we already know
- * them. The only warm thing on the screen is the button that begins.
+ * them. The side panel is the way to anywhere else. The only warm thing on
+ * the screen is the button that begins.
  */
 export function VivaSetup({
   profile,
@@ -49,17 +48,8 @@ export function VivaSetup({
   }
 
   return (
-    <form onSubmit={submit} className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-2xl items-center px-3 pt-4 sm:px-7">
-        <Button asChild variant="ghost" size="touch" className="px-3">
-          <Link href={HOME_PATH}>
-            <ArrowLeftIcon aria-hidden="true" />
-            Home
-          </Link>
-        </Button>
-      </header>
-
-      <main className="animate-rise mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 pt-6 pb-12 sm:px-10">
+    <form onSubmit={submit} className="flex flex-1 flex-col">
+      <main className="animate-rise mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 pt-10 pb-12 sm:px-10 sm:pt-14">
         <div className="flex flex-col gap-3">
           <p className="label-mono text-muted-foreground">
             Class {profile.class_level} · {firstName}
