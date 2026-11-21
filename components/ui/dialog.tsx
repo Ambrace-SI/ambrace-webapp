@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 /**
  * A small window over the page that must be answered or dismissed. From
  * shadcn/ui, cut down to the parts Ambrace uses.
+ *
+ * The page behind is dimmed and softly blurred, as in the shadcn template: it
+ * is still there, but plainly out of reach until the window is dealt with.
  */
 function Dialog({
   ...props
@@ -24,12 +27,12 @@ function DialogContent({
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="dialog-overlay"
-        className="fixed inset-0 z-50 bg-foreground/30 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none"
+        className="fixed inset-0 z-50 bg-foreground/25 supports-backdrop-filter:backdrop-blur-sm duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none"
       />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-lg duration-150 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl duration-200 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
           className,
         )}
         {...props}
@@ -38,6 +41,12 @@ function DialogContent({
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
+}
+
+function DialogClose({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 function DialogTitle({
@@ -66,4 +75,4 @@ function DialogDescription({
   );
 }
 
-export { Dialog, DialogContent, DialogDescription, DialogTitle };
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle };

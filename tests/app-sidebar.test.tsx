@@ -190,6 +190,7 @@ beforeEach(() => {
   onScreen("laptop");
 
   window.localStorage.clear();
+  window.history.replaceState(null, "", "/");
   panelPreference.remember(true);
   address.pathname = "/";
   address.push.mockReset();
@@ -887,6 +888,60 @@ describe("the account menu", () => {
       screen.getByRole("button", { name: "Account menu for Your account" })
         .textContent,
     ).toBe("YYour account");
+  });
+
+  test("Settings is in the menu, above the way out, and opens the Settings window", async () => {
+    renderShell();
+    await press("Account menu for Asha Rao");
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Settings", "Sign out"]);
+
+    await press("Settings", "menuitem");
+
+    expect(
+      await screen.findByRole("dialog", { name: "Settings" }),
+    ).toBeTruthy();
+    expect(window.location.hash).toBe("#settings/profile");
+  });
+
+  test("on a phone, opening Settings puts the drawer away first", async () => {
+    onScreen("phone");
+    renderShell();
+    await press("Open the side panel");
+    await press("Account menu for Asha Rao");
+
+    await press("Settings", "menuitem");
+
+    expect(
+      await screen.findByRole("dialog", { name: "Settings" }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Your vivas and account" }),
+      ).toBeNull(),
+    );
+  });
+
+  test("Settings cannot open over a page that has the whole screen", async () => {
+    function Viva() {
+      useWholeScreen(true);
+      return <p>a viva</p>;
+    }
+    window.history.replaceState(null, "", "#settings/profile");
+    const client = new QueryClient();
+    client.setQueryData(["me"], ME);
+
+    render(
+      <QueryClientProvider client={client}>
+        <AppShell>
+          <Viva />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("a viva")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   test("signing out is one step inside the menu, and shows that it is working", async () => {

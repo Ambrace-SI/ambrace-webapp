@@ -3,16 +3,15 @@
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { ArrowLeftIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { Orbit } from "@/components/brand/orbit";
 import { ChoiceChips } from "@/components/forms/choice-chips";
 import {
-  FieldError,
-  FieldLabel,
   FormMessage,
   SubmitButton,
+  TextAreaField,
   TextField,
 } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
@@ -281,10 +280,17 @@ function OnboardingSteps({
                 optional
               />
 
-              <SchoolAddressField
+              <TextAreaField
+                label="School address"
+                name="school-address"
+                autoComplete="street-address"
+                maxLength={SCHOOL_ADDRESS_MAX_LENGTH}
                 value={draft.schoolAddress}
-                onChange={(schoolAddress) => update({ schoolAddress })}
+                onChange={(event) =>
+                  update({ schoolAddress: event.target.value })
+                }
                 error={errors.schoolAddress}
+                optional
               />
 
               <div className="flex flex-col gap-3">
@@ -324,38 +330,6 @@ function OnboardingSteps({
           )}
         </div>
       </main>
-    </div>
-  );
-}
-
-function SchoolAddressField({
-  value,
-  onChange,
-  error,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  const id = useId();
-  return (
-    <div className="flex flex-col gap-2">
-      <FieldLabel htmlFor={id} optional>
-        School address
-      </FieldLabel>
-      <textarea
-        id={id}
-        name="school-address"
-        rows={3}
-        autoComplete="street-address"
-        maxLength={SCHOOL_ADDRESS_MAX_LENGTH}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className="w-full resize-none rounded-lg border border-input bg-transparent px-3.5 py-2.5 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-      />
-      <FieldError id={`${id}-error`} message={error} />
     </div>
   );
 }

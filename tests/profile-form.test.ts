@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/errors";
 import {
   EMPTY_DRAFT,
+  draftFromProfile,
   hasErrors,
   suggestedName,
   toProfileUpdate,
@@ -162,5 +163,52 @@ describe("reading a failed API call", () => {
 
   test("a rejected request is not retried", () => {
     expect(isWorthRetrying(failure(422))).toBe(false);
+  });
+});
+
+describe("a saved profile, opened for editing", () => {
+  const SAVED = {
+    name: "Asha Rao",
+    class_level: 9,
+    board: "CBSE" as const,
+    school_name: "DPS",
+    school_address: "12 MG Road",
+    created_at: "2026-11-21T10:00:00Z",
+    updated_at: "2026-11-21T10:00:00Z",
+  };
+
+  test("is laid out the way the forms hold it", () => {
+    expect(draftFromProfile(SAVED)).toEqual({
+      name: "Asha Rao",
+      classLevel: 9,
+      board: "CBSE",
+      schoolName: "DPS",
+      schoolAddress: "12 MG Road",
+    });
+  });
+
+  test("what was never given is an empty box, not the word null", () => {
+    const draft = draftFromProfile({
+      ...SAVED,
+      board: null,
+      school_name: null,
+      school_address: null,
+    });
+
+    expect(draft.board).toBeNull();
+    expect(draft.schoolName).toBe("");
+    expect(draft.schoolAddress).toBe("");
+  });
+
+  test("saving it unchanged sends back exactly what was saved", () => {
+    expect(
+      toProfileUpdate(draftFromProfile(SAVED), { includeOptional: true }),
+    ).toEqual({
+      name: "Asha Rao",
+      class_level: 9,
+      board: "CBSE",
+      school_name: "DPS",
+      school_address: "12 MG Road",
+    });
   });
 });
