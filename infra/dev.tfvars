@@ -11,4 +11,10 @@ connect_sources = [
   "https://ambrace-dev.auth.ap-south-1.amazoncognito.com",
   # The live viva: the browser streams audio straight to Gemini.
   "wss://generativelanguage.googleapis.com",
+  # Voice-quality telemetry (PostHog). Sent only when the build has a key.
+  "https://us.i.posthog.com",
 ]
+
+# The browser enforces the policy on dev. Prod stays report-only until a full
+# viva has run here with a clean console.
+enforce_content_security_policy = true

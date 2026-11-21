@@ -92,13 +92,21 @@ next load.
 
 ## Content security policy
 
-It starts as report-only (`enforce_content_security_policy = false`): the
-browser logs what it would have blocked and blocks nothing. Once sign-in and a
-full viva run with a clean console on dev, set it to `true` in the var file and
-`APPLY`.
+Dev enforces it (`enforce_content_security_policy = true` in `dev.tfvars`).
+Prod is still report-only: the browser logs what it would have blocked and
+blocks nothing. Once sign-in and a full viva run with a clean console on dev,
+set it to `true` in `prod.tfvars` and `APPLY`.
 
-When the browser needs to talk to a new origin (for example PostHog), add it to
-`connect_sources` in the var file.
+When the browser needs to talk to a new origin, add it to `connect_sources` in
+the var file.
+
+## Telemetry (PostHog)
+
+Off until a key is set. To turn it on for an environment, create the String
+parameter `/ambrace/<env>/web/posthog_key` in SSM (a PostHog project key is
+public) and `PUBLISH`. `/ambrace/<env>/web/posthog_host` is optional and
+defaults to `https://us.i.posthog.com`, which is already in `connect_sources`;
+a different host must be added there too.
 
 ## Try it without AWS
 

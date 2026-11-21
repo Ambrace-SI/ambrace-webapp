@@ -2,12 +2,12 @@
 
 import { signOut } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Orbit } from "@/components/brand/orbit";
 import { Button } from "@/components/ui/button";
 import { isSignedOutError } from "@/lib/api/errors";
-import { configureAuth } from "@/lib/auth/client";
+import { configureAuth, getAccessToken } from "@/lib/auth/client";
 import { ONBOARDING_PATH, signInUrlFor } from "@/lib/auth/routes";
 import { useMe } from "@/lib/hooks/use-me";
 
@@ -22,6 +22,10 @@ import { useMe } from "@/lib/hooks/use-me";
  * replaced: each page shows its own outline of what is coming. That keeps the
  * page's frame on screen from the first moment instead of a blank wait, and it
  * is what lets Next.js prepare the page ahead of a navigation.
+ *
+ * Whether anyone is signed in on this device is known without the backend, so
+ * a visitor with no session goes to sign-in at once: they never wait for the
+ * backend to wake, and an outage never stands between them and sign-in.
  */
 export function SessionGate({
   needs,
@@ -33,26 +37,54 @@ export function SessionGate({
   const router = useRouter();
   const { data: me, error, refetch, isRefetching } = useMe();
 
-  const signedOut = error ? isSignedOutError(error) : false;
+  const [noSession, setNoSession] = useState(false);
+
+  // The backend no longer accepts a session this device still holds.
+  const refused = error ? isSignedOutError(error) : false;
+  const signedOut = noSession || refused;
   const misplaced =
     needs === "profile" && me !== undefined && !me.onboarding_complete;
 
   useEffect(() => {
+    let left = false;
+    void getAccessToken().then((token) => {
+      if (!token && !left) setNoSession(true);
+    });
+    return () => {
+      left = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!signedOut) return;
-    // Nobody is signed in, or the backend no longer accepts this session.
-    // Clear what is left and start again, remembering where they were going.
+    // Start again at sign-in, remembering where they were going.
     const { pathname, search } = window.location;
+    const toSignIn = () =>
+      window.location.replace(signInUrlFor(pathname, search));
+    // With no session there is nothing to clear.
+    if (noSession) return toSignIn();
     configureAuth();
     void signOut()
       .catch(() => undefined)
-      .finally(() => window.location.replace(signInUrlFor(pathname, search)));
-  }, [signedOut]);
+      .finally(toSignIn);
+  }, [signedOut, noSession]);
 
   useEffect(() => {
     if (misplaced) router.replace(ONBOARDING_PATH);
   }, [misplaced, router]);
 
-  if (error && !signedOut) {
+  if (signedOut || misplaced) {
+    return (
+      <StatusScreen>
+        <Orbit className="w-16" />
+        <p className="label-mono text-muted-foreground" role="status">
+          One moment
+        </p>
+      </StatusScreen>
+    );
+  }
+
+  if (error) {
     return (
       <StatusScreen>
         <h1 className="text-2xl font-light">We can&apos;t reach Ambrace</h1>
@@ -66,17 +98,6 @@ export function SessionGate({
         >
           {isRefetching ? "Trying…" : "Try again"}
         </Button>
-      </StatusScreen>
-    );
-  }
-
-  if (signedOut || misplaced) {
-    return (
-      <StatusScreen>
-        <Orbit className="w-16" />
-        <p className="label-mono text-muted-foreground" role="status">
-          One moment
-        </p>
       </StatusScreen>
     );
   }

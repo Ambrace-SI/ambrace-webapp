@@ -29,6 +29,10 @@ const configureAuth = vi.fn();
 vi.mock("@/lib/auth/client", () => ({
   configureAuth: () => configureAuth(),
 }));
+const getSignInAccount = vi.fn();
+vi.mock("@/lib/auth/account", () => ({
+  getSignInAccount: () => getSignInAccount(),
+}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,10 +95,16 @@ describe("a page that breaks", () => {
 describe("signing out", () => {
   const assign = vi.fn();
   beforeEach(() => {
+    vi.useFakeTimers();
     signOut.mockReset();
     signOut.mockResolvedValue(undefined);
+    getSignInAccount.mockReset();
+    getSignInAccount.mockResolvedValue({ email: null, method: "password" });
     assign.mockReset();
     vi.stubGlobal("location", { ...window.location, assign });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   test("ends the session, then returns to the sign-in screen", async () => {
@@ -109,6 +119,48 @@ describe("signing out", () => {
 
   test("still leaves the app if ending the session fails", async () => {
     signOut.mockRejectedValue(new Error("offline"));
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+
+    expect(assign).toHaveBeenCalledWith("/sign-in");
+  });
+
+  test("a Google account is left to the sign-in service, which brings the browser back itself", async () => {
+    // Going anywhere ourselves would cancel the trip that ends the session
+    // there, and the next person to press "Continue with Google" on this
+    // computer would be signed in as this student.
+    getSignInAccount.mockResolvedValue({ email: null, method: "google" });
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  test("a Google account whose trip never starts is still returned to sign-in", async () => {
+    getSignInAccount.mockResolvedValue({ email: null, method: "google" });
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+    vi.advanceTimersByTime(5_000);
+
+    expect(assign).toHaveBeenCalledWith("/sign-in");
+  });
+
+  test("a Google account still leaves at once if ending the session fails", async () => {
+    getSignInAccount.mockResolvedValue({ email: null, method: "google" });
+    signOut.mockRejectedValue(new Error("offline"));
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+
+    expect(assign).toHaveBeenCalledWith("/sign-in");
+  });
+
+  test("an account that cannot be read is treated as an Ambrace password", async () => {
+    getSignInAccount.mockRejectedValue(new Error("Nobody is signed in."));
     const { leaveAmbrace } = await import("@/lib/app/sign-out");
 
     await leaveAmbrace();
