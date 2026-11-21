@@ -11,7 +11,6 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { AppHeader } from "@/components/app/app-header";
 import { Home } from "@/components/app/home";
 import { useMe, useSaveProfile } from "@/lib/hooks/use-me";
 import { useVivaStore } from "@/lib/store/viva-store";
@@ -28,10 +27,6 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-const signOut = vi.fn();
-vi.mock("aws-amplify/auth", () => ({ signOut: () => signOut() }));
-vi.mock("@/lib/auth/client", () => ({ configureAuth: vi.fn() }));
-
 const api = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api/axios", () => ({
   default: {
@@ -39,8 +34,6 @@ vi.mock("@/lib/api/axios", () => ({
     put: (...input: unknown[]) => api.put(...input),
   },
 }));
-
-const assign = vi.fn();
 
 const PROFILE: Profile = {
   name: "Asha Rao",
@@ -68,12 +61,8 @@ function withQueries(seed?: Me) {
 }
 
 beforeEach(() => {
-  signOut.mockReset();
-  signOut.mockResolvedValue(undefined);
   api.get.mockReset();
   api.put.mockReset();
-  assign.mockReset();
-  vi.stubGlobal("location", { ...window.location, assign });
   useVivaStore.getState().resetSession();
 });
 afterEach(() => {
@@ -137,51 +126,6 @@ describe("the home screen", () => {
     expect(screen.getByRole("status").textContent).toMatch(/Loading/);
     expect(screen.getByRole("main").getAttribute("aria-busy")).toBe("true");
     expect(screen.queryByRole("heading")).toBeNull();
-  });
-});
-
-describe("signing out", () => {
-  test("ends the session and returns to the sign-in screen", async () => {
-    render(<AppHeader />);
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Sign out" }));
-
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/sign-in"));
-    expect(signOut).toHaveBeenCalledTimes(1);
-  });
-
-  test("still leaves the app if ending the session fails", async () => {
-    signOut.mockRejectedValue(new Error("offline"));
-    render(<AppHeader />);
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Sign out" }));
-
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/sign-in"));
-  });
-
-  test("cannot be pressed twice while it is working", async () => {
-    signOut.mockReturnValue(new Promise(() => undefined));
-    render(<AppHeader />);
-    const button = screen.getByRole("button", {
-      name: "Sign out",
-    }) as HTMLButtonElement;
-
-    await userEvent.setup().click(button);
-
-    expect(button.disabled).toBe(true);
-    expect(button.getAttribute("aria-busy")).toBe("true");
-  });
-
-  test("the header uses the logo for a light surface", () => {
-    render(<AppHeader />);
-
-    expect(screen.getByText("Ambrace").getAttribute("data-src")).toBe(
-      "/brand/ambrace-lowercase-horizontal.svg",
-    );
   });
 });
 

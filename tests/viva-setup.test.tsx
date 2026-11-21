@@ -313,7 +313,9 @@ describe("narrowing the focus", () => {
   });
 
   test("no more than twenty topics of the student's own", async () => {
-    const user = userEvent.setup();
+    // Sixty-odd presses: without a pause between each this stays well inside
+    // the time limit even when the whole suite runs at once.
+    const user = userEvent.setup({ delay: null });
     renderSetup();
     await chooseCellChapter(user);
     const input = focus().getByLabelText("Add a topic of your own");

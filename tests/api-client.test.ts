@@ -13,7 +13,7 @@ import api, {
   startVivaSession,
 } from "@/lib/api/axios";
 import { httpStatus, isSignedOutError } from "@/lib/api/errors";
-import { historyService } from "@/lib/api/history";
+import { deleteViva, getHistory, renameViva } from "@/lib/api/history";
 import { getMe, saveProfile } from "@/lib/api/me";
 import type { ConcludeVivaRequest, VivaStartRequest } from "@/types/viva";
 
@@ -244,7 +244,7 @@ describe("history calls", () => {
   test("a page of history asks for twenty sessions from a cursor", async () => {
     answer(200, { sessions: [], next_cursor: null });
 
-    await historyService.getHistory("cursor-1");
+    await getHistory("cursor-1");
 
     expect(sent[0]).toMatchObject({
       method: "get",
@@ -254,8 +254,8 @@ describe("history calls", () => {
   });
 
   test("renaming sends the new title; deleting names the session", async () => {
-    await historyService.renameSession("session-1", "Light and optics");
-    await historyService.deleteSession("session-1");
+    await renameViva("session-1", "Light and optics");
+    await deleteViva("session-1");
 
     expect(sent[0]).toMatchObject({
       method: "patch",

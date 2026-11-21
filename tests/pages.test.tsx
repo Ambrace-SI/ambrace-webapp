@@ -36,8 +36,10 @@ vi.mock("@/components/report/viva-report", () => ({
   VivaReport: () => <p>report</p>,
   ReportOutline: () => <p>report outline</p>,
 }));
-vi.mock("@/components/app/app-header", () => ({
-  AppHeader: () => <p>header</p>,
+vi.mock("@/components/app/app-shell", () => ({
+  AppShell: ({ children }: { children: ReactNode }) => (
+    <div data-frame="app">{children}</div>
+  ),
 }));
 vi.mock("@/components/app/session-gate", () => ({
   SessionGate: ({
@@ -82,7 +84,7 @@ describe("signed-out addresses", () => {
 });
 
 describe("signed-in addresses", () => {
-  test("the app needs a profile, and shows the header above the page", async () => {
+  test("the app needs a profile, and frames the page with the side panel", async () => {
     const { default: AppLayout } = await import("@/app/(app)/layout");
 
     const { container } = render(
@@ -93,7 +95,7 @@ describe("signed-in addresses", () => {
 
     const gate = container.querySelector("[data-needs]");
     expect(gate?.getAttribute("data-needs")).toBe("profile");
-    expect(gate?.textContent).toBe("headera page");
+    expect(gate?.querySelector("[data-frame=app]")?.textContent).toBe("a page");
   });
 
   test("home is at the root", async () => {
@@ -105,7 +107,7 @@ describe("signed-in addresses", () => {
     expect(screen.getByText("home")).toBeTruthy();
   });
 
-  test("a report sits inside the app, under the header", async () => {
+  test("a report sits inside the app", async () => {
     const page = await import("@/app/(app)/v/[id]/page");
 
     render(<page.default />);
@@ -114,7 +116,7 @@ describe("signed-in addresses", () => {
     expect(screen.getByText("report")).toBeTruthy();
   });
 
-  test("the viva needs a profile but has no header to wander off through", async () => {
+  test("the viva needs a profile but has no side panel to wander off through", async () => {
     const { default: VivaLayout } = await import("@/app/(viva)/layout");
     const page = await import("@/app/(viva)/viva/page");
 
@@ -128,6 +130,7 @@ describe("signed-in addresses", () => {
     const gate = container.querySelector("[data-needs]");
     expect(gate?.getAttribute("data-needs")).toBe("profile");
     expect(gate?.textContent).toBe("viva room");
+    expect(container.querySelector("[data-frame=app]")).toBeNull();
   });
 
   test("onboarding only needs a session, or it would redirect to itself", async () => {
