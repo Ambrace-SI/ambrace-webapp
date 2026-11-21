@@ -42,3 +42,9 @@ next-env.d.ts
 
 # the example is documentation, not a secret
 !.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan

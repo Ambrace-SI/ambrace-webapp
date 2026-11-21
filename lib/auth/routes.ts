@@ -1,8 +1,10 @@
 /**
- * Which addresses can be seen without signing in, and where to send people.
+ * Which addresses are for signed-out people, and where to send everyone else.
  *
- * Ambrace has no public pages. Everything except the sign-in screens sits
- * behind the gate in proxy.ts.
+ * Ambrace has no public pages. The site is plain files with no server in
+ * front, so the gate runs in the browser: `SessionGate` around the app and
+ * `SignedOutOnly` on the sign-in screens. Neither protects data; the backend
+ * checks every request.
  */
 
 export const SIGN_IN_PATH = "/sign-in";
@@ -13,8 +15,13 @@ export const ONBOARDING_PATH = "/onboarding";
 export const HOME_PATH = "/";
 export const VIVA_PATH = "/viva";
 
-/** A finished viva's report. The voice engine sends students to this path. */
-export const reportPath = (sessionId: string) => `/v/${sessionId}`;
+export const REPORT_PATH = "/v";
+/** Which report: the site is plain files, so it cannot be part of the path. */
+export const REPORT_ID_PARAM = "id";
+
+/** A finished viva's report. The one place its address is written. */
+export const reportPath = (sessionId: string) =>
+  `${REPORT_PATH}?${REPORT_ID_PARAM}=${encodeURIComponent(sessionId)}`;
 
 /** Screens whose whole purpose is getting signed in. */
 const SIGNED_OUT_ONLY = [SIGN_IN_PATH, SIGN_UP_PATH, RESET_PASSWORD_PATH];

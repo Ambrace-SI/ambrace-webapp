@@ -9,7 +9,7 @@ import { SessionState } from "../types/viva";
 
 for (const [status, expectedState, expectedPath] of [
   ["abandoned", SessionState.IDLE, "/"],
-  ["completed", SessionState.COMPLETED, "/v/session-one"],
+  ["completed", SessionState.COMPLETED, "/v?id=session-one"],
 ] as const) {
   test(`abandon response ${status} follows the authoritative session status`, () => {
     const effects: string[] = [];

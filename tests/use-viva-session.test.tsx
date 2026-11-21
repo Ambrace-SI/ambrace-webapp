@@ -551,7 +551,7 @@ describe("finishing", () => {
 
     await act(() => result.current.requestConclusion());
 
-    expect(router.push).toHaveBeenCalledWith("/v/session-1");
+    expect(router.push).toHaveBeenCalledWith("/v?id=session-1");
     expect(state().sessionState).toBe(SessionState.COMPLETED);
   });
 

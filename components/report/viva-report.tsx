@@ -2,12 +2,12 @@
 
 import { ArrowLeftIcon, ArrowUpRightIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { httpStatus } from "@/lib/api/errors";
-import { HOME_PATH, VIVA_PATH } from "@/lib/auth/routes";
+import { HOME_PATH, REPORT_ID_PARAM, VIVA_PATH } from "@/lib/auth/routes";
 import { useVivaResult } from "@/lib/hooks/use-viva-result";
 
 const DATE = new Intl.DateTimeFormat("en-IN", {
@@ -26,7 +26,7 @@ const DATE = new Intl.DateTimeFormat("en-IN", {
  * shape as well as by colour, and neither reads as a punishment.
  */
 export function VivaReport() {
-  const { id } = useParams<{ id: string }>();
+  const id = useSearchParams().get(REPORT_ID_PARAM) ?? "";
   const { data: session, error, isPending, refetch } = useVivaResult(id);
 
   if (isPending) return <ReportOutline />;

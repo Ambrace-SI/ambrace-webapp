@@ -1,0 +1,375 @@
+name: Deploy (reusable)
+
+# Shared by deploy-dev.yml and deploy-prod.yml so both environments are deployed
+# by exactly the same steps. Not triggered directly.
+#
+# AWS access: no stored keys. A job that declares a GitHub Environment gets an
+# OIDC token whose subject names that environment, and AWS exchanges it for
+# one-hour credentials on the role in vars.AWS_DEPLOY_ROLE_ARN. The role is
+# defined in ambrace-backend/infra/bootstrap/web_deploy.tf.
+#
+# Settings: nothing about an environment is stored in GitHub beyond the role,
+# account and region. The build's settings and the bucket to publish to are
+# read from SSM Parameter Store under /ambrace/<env>/web.
+#
+# The jobs that hold AWS credentials never install or run npm packages, and the
+# job that does has no credentials: a compromised dependency cannot reach AWS.
+
+on:
+  workflow_call:
+    inputs:
+      github_environment:
+        description: "GitHub Environment to deploy through (development or production)"
+        required: true
+        type: string
+      tf_environment:
+        description: "Environment name (dev or prod); selects <env>.tfvars, <env>.backend.hcl and the SSM path"
+        required: true
+        type: string
+      operation:
+        description: "PLAN or APPLY the hosting, or PUBLISH the site"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  TF_ENVIRONMENT: ${{ inputs.tf_environment }}
+
+jobs:
+  # Lint, types, tests, build and the Terraform contract tests. Nothing is
+  # planned, applied or published from a commit that fails them.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
+  # ============================================================================
+  # PLAN / APPLY: the hosting
+  # ============================================================================
+  infrastructure:
+    name: ${{ inputs.operation == 'APPLY' && 'Apply' || 'Plan' }} hosting (${{ inputs.tf_environment }})
+    if: ${{ inputs.operation == 'PLAN' || inputs.operation == 'APPLY' }}
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.github_environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      APPLY: ${{ inputs.operation == 'APPLY' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check environment configuration
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          AWS_REGION_VAR: ${{ vars.AWS_REGION }}
+          AWS_ACCOUNT_ID_VAR: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          if [ -z "${AWS_DEPLOY_ROLE_ARN}" ] || [ -z "${AWS_REGION_VAR}" ] || [ -z "${AWS_ACCOUNT_ID_VAR}" ]; then
+            echo "Error: the GitHub Environment must define AWS_DEPLOY_ROLE_ARN, AWS_REGION and AWS_ACCOUNT_ID." >&2
+            echo "See infra/README.md, 'Connect GitHub'." >&2
+            exit 1
+          fi
+          case "${TF_ENVIRONMENT}" in
+            dev|prod) ;;
+            *) echo "Error: tf_environment must be dev or prod." >&2; exit 1 ;;
+          esac
+          test -f "infra/${TF_ENVIRONMENT}.tfvars"
+          test -f "infra/${TF_ENVIRONMENT}.backend.hcl"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.13.4"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: github-web-${{ inputs.tf_environment }}-${{ github.run_id }}
+
+      - name: Confirm the AWS account
+        env:
+          EXPECTED_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          if [ "${ACTUAL_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]; then
+            echo "::error::Expected AWS account ${EXPECTED_ACCOUNT}, got ${ACTUAL_ACCOUNT}."
+            exit 1
+          fi
+          aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table
+
+      - name: Terraform init
+        run: terraform -chdir=infra init -backend-config="${TF_ENVIRONMENT}.backend.hcl"
+
+      - name: Terraform validate
+        run: terraform -chdir=infra validate
+
+      - name: Terraform plan
+        run: terraform -chdir=infra plan -var-file="${TF_ENVIRONMENT}.tfvars" -out=deploy.tfplan
+
+      - name: Inspect plan and block destructive changes
+        run: |
+          PLAN_JSON=$(terraform -chdir=infra show -json deploy.tfplan)
+
+          ACTIVE_CHANGES=$(echo "${PLAN_JSON}" | jq -c '
+            [.resource_changes[]? | select(.change.actions != ["no-op"] and .change.actions != ["read"])]
+          ')
+
+          echo "Resource changes in the saved plan:"
+          echo "${ACTIVE_CHANGES}" | jq -r '.[] | "  - \(.address): \(.change.actions | join(","))"'
+          echo "Total: $(echo "${ACTIVE_CHANGES}" | jq 'length')"
+
+          # A pipeline never deletes or replaces infrastructure on its own. The
+          # bucket or the distribution going away must be a deliberate, manual act.
+          BLOCKED_DELETIONS=$(echo "${ACTIVE_CHANGES}" | jq -c '[.[] | select(.change.actions | index("delete"))]')
+          if [ "$(echo "${BLOCKED_DELETIONS}" | jq 'length')" -gt 0 ]; then
+            echo "ERROR: the plan deletes or replaces resources. Automatic apply is blocked:" >&2
+            echo "${BLOCKED_DELETIONS}" | jq -r '.[] | "  - \(.address): \(.change.actions | join(","))"' >&2
+            exit 1
+          fi
+          echo "Plan safety check passed: no deletions or replacements."
+
+          if [ "${APPLY}" != "true" ]; then
+            echo "PLAN ONLY: nothing in AWS will be changed by this run."
+          fi
+
+      - name: Terraform apply (saved plan)
+        if: ${{ inputs.operation == 'APPLY' }}
+        run: terraform -chdir=infra apply deploy.tfplan
+
+      - name: Show where to point DNS
+        if: ${{ inputs.operation == 'APPLY' }}
+        run: |
+          {
+            echo "### Hosting is in place"
+            echo ""
+            echo "At the DNS provider, the app domain must be a CNAME to:"
+            echo ""
+            echo "    $(terraform -chdir=infra output -raw distribution_domain_name)"
+            echo ""
+            echo "Then run this workflow with PUBLISH to put the site online."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  # ============================================================================
+  # PUBLISH, step 1: read the build's settings (AWS credentials, no npm)
+  # ============================================================================
+  settings:
+    name: Read settings (${{ inputs.tf_environment }})
+    if: ${{ inputs.operation == 'PUBLISH' }}
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ${{ inputs.github_environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    # None of these is a secret: each one ends up in JavaScript that any
+    # browser downloads, or is a bucket name or an ID.
+    outputs:
+      app_url: ${{ steps.read.outputs.app_url }}
+      api_base_url: ${{ steps.read.outputs.api_base_url }}
+      cognito_user_pool_id: ${{ steps.read.outputs.cognito_user_pool_id }}
+      cognito_client_id: ${{ steps.read.outputs.cognito_client_id }}
+      cognito_domain: ${{ steps.read.outputs.cognito_domain }}
+
+    steps:
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: github-web-settings-${{ inputs.tf_environment }}-${{ github.run_id }}
+
+      - name: Read build settings from SSM
+        id: read
+        run: |
+          PREFIX="/ambrace/${TF_ENVIRONMENT}/web"
+          PARAMETERS=$(aws ssm get-parameters-by-path --path "${PREFIX}" --no-recursive --output json)
+
+          for NAME in app_url api_base_url cognito_user_pool_id cognito_client_id cognito_domain; do
+            VALUE=$(echo "${PARAMETERS}" | jq -r --arg name "${PREFIX}/${NAME}" '.Parameters[] | select(.Name == $name) | .Value')
+            if [ -z "${VALUE}" ]; then
+              echo "::error::${PREFIX}/${NAME} is not set. It is written by the backend deployment (ambrace-backend, infra/app)."
+              exit 1
+            fi
+            echo "${NAME}=${VALUE}" >> "${GITHUB_OUTPUT}"
+            echo "${NAME} = ${VALUE}"
+          done
+
+  # ============================================================================
+  # PUBLISH, step 2: build the site (npm, no AWS credentials)
+  # ============================================================================
+  build:
+    name: Build site (${{ inputs.tf_environment }})
+    needs: settings
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # These are baked into the files, so a build belongs to one environment.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_APP_URL: ${{ needs.settings.outputs.app_url }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ needs.settings.outputs.api_base_url }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ needs.settings.outputs.cognito_user_pool_id }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ needs.settings.outputs.cognito_client_id }}
+          NEXT_PUBLIC_COGNITO_DOMAIN: ${{ needs.settings.outputs.cognito_domain }}
+
+      - name: Upload built site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ambrace-web-${{ inputs.tf_environment }}
+          path: out
+          retention-days: 1
+          if-no-files-found: error
+
+  # ============================================================================
+  # PUBLISH, step 3: put it online (AWS credentials, no npm)
+  # ============================================================================
+  publish:
+    name: Publish site (${{ inputs.tf_environment }})
+    needs: [settings, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.github_environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Only for the script that checks the live site; it uses nothing but Node.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download built site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ambrace-web-${{ inputs.tf_environment }}
+          path: out
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: github-web-publish-${{ inputs.tf_environment }}-${{ github.run_id }}
+
+      - name: Confirm the AWS account
+        env:
+          EXPECTED_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          if [ "${ACTUAL_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]; then
+            echo "::error::Expected AWS account ${EXPECTED_ACCOUNT}, got ${ACTUAL_ACCOUNT}."
+            exit 1
+          fi
+
+      - name: Find where to publish
+        run: |
+          PREFIX="/ambrace/${TF_ENVIRONMENT}/web/hosting"
+          for NAME in site_bucket distribution_id expected_headers; do
+            VALUE=$(aws ssm get-parameter --name "${PREFIX}/${NAME}" --query Parameter.Value --output text) || {
+              echo "::error::${PREFIX}/${NAME} is not set. Run this workflow with APPLY first."
+              exit 1
+            }
+            KEY=$(echo "${NAME}" | tr '[:lower:]' '[:upper:]')
+            {
+              echo "${KEY}<<END_OF_VALUE"
+              echo "${VALUE}"
+              echo "END_OF_VALUE"
+            } >> "${GITHUB_ENV}"
+          done
+
+      # Order matters. The hashed files go up first, so a page never points at
+      # a script that is not there yet. Nothing is deleted from _next/static: a
+      # student already in a viva is running the previous build and may still
+      # fetch its files.
+      - name: Upload hashed assets (cached for a year)
+        run: |
+          aws s3 sync out/_next/static "s3://${SITE_BUCKET}/_next/static" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --no-progress
+
+      # Everything else has a stable name, so browsers must ask each time
+      # whether it changed. Pages that no longer exist are removed.
+      - name: Upload pages and public files (always revalidated)
+        run: |
+          aws s3 sync out "s3://${SITE_BUCKET}" \
+            --exclude "_next/static/*" \
+            --delete \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --no-progress
+
+      # Hashed files from builds older than 30 days that this build does not
+      # use. Every publish re-uploads the files it uses, so their date is fresh.
+      - name: Remove assets no build has used for 30 days
+        run: |
+          CUTOFF=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%S)
+          STALE=$(aws s3api list-objects-v2 --bucket "${SITE_BUCKET}" --prefix "_next/static/" \
+            --query "Contents[?LastModified<'${CUTOFF}'].Key" --output json | jq -r '.[]?')
+          COUNT=0
+          while IFS= read -r KEY; do
+            [ -z "${KEY}" ] && continue
+            [ -f "out/${KEY}" ] && continue
+            aws s3 rm "s3://${SITE_BUCKET}/${KEY}" --only-show-errors
+            COUNT=$((COUNT + 1))
+          done <<< "${STALE}"
+          echo "Removed ${COUNT} old asset file(s)."
+
+      - name: Refresh CloudFront
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths "/*" --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${DISTRIBUTION_ID}" --id "${INVALIDATION_ID}"
+
+      - name: Check the live site
+        env:
+          APP_URL: ${{ needs.settings.outputs.app_url }}
+        run: node scripts/check-live-site.mjs "${APP_URL}" "${EXPECTED_HEADERS}"
+
+      - name: Summary
+        env:
+          APP_URL: ${{ needs.settings.outputs.app_url }}
+        run: echo "### Published to ${APP_URL} from \`${GITHUB_SHA::7}\`" >> "${GITHUB_STEP_SUMMARY}"

@@ -61,13 +61,18 @@ function renderGate(needs: "profile" | "session") {
   );
 }
 
+/** Puts the student on a page of the app. */
+function visit(pathname: string, search = "") {
+  vi.stubGlobal("location", { pathname, search, replace: replaceLocation });
+}
+
 beforeEach(() => {
   router.replace.mockReset();
   getMe.mockReset();
   signOut.mockReset();
   signOut.mockResolvedValue(undefined);
   replaceLocation.mockReset();
-  vi.stubGlobal("location", { ...window.location, replace: replaceLocation });
+  visit("/");
 });
 afterEach(() => {
   cleanup();
@@ -142,6 +147,19 @@ test("trying again after an outage brings the page back", async () => {
 
   await screen.findByText("The page");
   expect(getMe).toHaveBeenCalledTimes(2);
+});
+
+test("someone sent to sign-in comes back to the page they asked for", async () => {
+  getMe.mockRejectedValue(failure(401));
+  visit("/v", "?id=abc");
+
+  renderGate("profile");
+
+  await waitFor(() =>
+    expect(replaceLocation).toHaveBeenCalledWith(
+      "/sign-in?next=%2Fv%3Fid%3Dabc",
+    ),
+  );
 });
 
 test("a failed sign-out during cleanup still returns to sign-in", async () => {

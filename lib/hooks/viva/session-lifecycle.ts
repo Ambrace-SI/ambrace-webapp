@@ -1,4 +1,5 @@
 import type { AbandonVivaResponse } from "@/lib/api/axios";
+import { reportPath } from "@/lib/auth/routes";
 import { SessionState } from "@/types/viva";
 import type {
   MicrophoneError,
@@ -49,7 +50,7 @@ export function applyAbandonOutcome(
   if (response.status === "completed") {
     actions.setSessionState(SessionState.COMPLETED);
     actions.cleanupResources();
-    actions.navigate(`/v/${sessionId}`);
+    actions.navigate(reportPath(sessionId));
     return;
   }
 

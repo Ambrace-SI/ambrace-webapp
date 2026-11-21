@@ -8,13 +8,12 @@ let configured = false;
 /**
  * Points the Amplify library at our Cognito user pool. Safe to call often.
  *
- * `ssr: true` keeps the session in cookies instead of localStorage, which is
- * what lets the server-side gate (proxy.ts) see whether someone is signed in
- * before any page is sent.
+ * The session is kept in the browser's own storage, not in cookies. No server
+ * reads it, and cookies would be sent along with every file request.
  */
 export function configureAuth(): void {
   if (configured) return;
-  Amplify.configure(buildAuthConfig(readAuthEnvironment()), { ssr: true });
+  Amplify.configure(buildAuthConfig(readAuthEnvironment()));
   configured = true;
 }
 

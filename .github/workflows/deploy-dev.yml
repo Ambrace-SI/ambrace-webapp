@@ -1,0 +1,40 @@
+name: Deploy Development
+
+# Manual: run from master or an Ambrace-* branch. The `development` GitHub
+# Environment refuses any other branch.
+#
+#   PLAN     shows what would change in the hosting (S3, CloudFront).
+#   APPLY    makes those changes.
+#   PUBLISH  builds the site and puts it online. Changes no infrastructure.
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "PLAN / APPLY change the hosting. PUBLISH puts the site online."
+        required: true
+        type: choice
+        default: "PLAN"
+        options:
+          - PLAN
+          - APPLY
+          - PUBLISH
+
+permissions:
+  contents: read
+
+# One dev deployment at a time; a newer run waits rather than cancelling one
+# that is mid-apply or mid-upload.
+concurrency:
+  group: ambrace-web-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      github_environment: development
+      tf_environment: dev
+      operation: ${{ inputs.operation }}

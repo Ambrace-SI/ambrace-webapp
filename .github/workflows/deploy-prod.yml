@@ -1,0 +1,62 @@
+name: Deploy Production
+
+# Manual only, and only from the `release` branch.
+#
+# Two independent locks enforce the branch:
+#   1. the guard job below fails the run on any other branch, and
+#   2. the `production` GitHub Environment only releases AWS credentials to the
+#      `release` branch, and only after a reviewer approves the run.
+#
+# Because the run uses the workflow files as they exist on `release`, a change
+# to the pipeline on master cannot affect production until it is promoted.
+#
+#   PLAN     shows what would change in the hosting (S3, CloudFront).
+#   APPLY    makes those changes.
+#   PUBLISH  builds the site and puts it online. Changes no infrastructure.
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "PLAN / APPLY change the hosting. PUBLISH puts the site online."
+        required: true
+        type: choice
+        default: "PLAN"
+        options:
+          - PLAN
+          - APPLY
+          - PUBLISH
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ambrace-web-prod-deployment
+  cancel-in-progress: false
+
+jobs:
+  release-branch-only:
+    name: Require the release branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Refuse any branch other than release
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "${REF}" != "refs/heads/release" ]; then
+            echo "::error::Production deploys only from the release branch (this run is on ${REF})."
+            exit 1
+          fi
+          echo "Running on the release branch."
+
+  deploy:
+    needs: release-branch-only
+    uses: ./.github/workflows/_deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      github_environment: production
+      tf_environment: prod
+      operation: ${{ inputs.operation }}

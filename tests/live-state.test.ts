@@ -130,8 +130,12 @@ describe("why a viva would not start", () => {
 });
 
 describe("addresses", () => {
-  test("the viva and its report live where the voice engine expects", () => {
+  test("the viva lives where the voice engine expects", () => {
     expect(VIVA_PATH).toBe("/viva");
-    expect(reportPath("abc-123")).toBe("/v/abc-123");
+  });
+
+  test("a report is one page, told which viva by the address after the ?", () => {
+    expect(reportPath("abc-123")).toBe("/v?id=abc-123");
+    expect(reportPath("a b&c")).toBe("/v?id=a%20b%26c");
   });
 });

@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const configure = vi.fn();
@@ -7,16 +6,6 @@ vi.mock("aws-amplify", () => ({ Amplify: { configure } }));
 const fetchBrowserSession = vi.fn();
 vi.mock("aws-amplify/auth", () => ({
   fetchAuthSession: () => fetchBrowserSession(),
-}));
-
-const fetchServerSession = vi.fn();
-vi.mock("aws-amplify/auth/server", () => ({
-  fetchAuthSession: (context: unknown) => fetchServerSession(context),
-}));
-
-const createServerRunner = vi.fn();
-vi.mock("@aws-amplify/adapter-nextjs", () => ({
-  createServerRunner: (input: unknown) => createServerRunner(input),
 }));
 
 const SETTINGS = {
@@ -32,19 +21,10 @@ function configureEnvironment(settings: Record<string, string> = SETTINGS) {
 }
 
 beforeEach(() => {
-  // Both modules remember that they have been set up; start each test fresh.
+  // The module remembers that it has been set up; start each test fresh.
   vi.resetModules();
   configure.mockReset();
   fetchBrowserSession.mockReset();
-  fetchServerSession.mockReset();
-  createServerRunner.mockReset();
-  createServerRunner.mockImplementation(() => ({
-    runWithAmplifyServerContext: ({
-      operation,
-    }: {
-      operation: (context: string) => unknown;
-    }) => operation("server-context"),
-  }));
   configureEnvironment();
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -100,7 +80,7 @@ describe("the access token used for API calls", () => {
 });
 
 describe("setting up the sign-in library in the browser", () => {
-  test("happens once, with the session kept in cookies for the server gate", async () => {
+  test("happens once, with the session kept in the browser and not in cookies", async () => {
     const { configureAuth } = await import("@/lib/auth/client");
 
     configureAuth();
@@ -109,7 +89,8 @@ describe("setting up the sign-in library in the browser", () => {
     expect(configure).toHaveBeenCalledTimes(1);
     const [config, options] = configure.mock.calls[0];
     expect(config.Auth.Cognito.userPoolClientId).toBe("client123");
-    expect(options).toEqual({ ssr: true });
+    // Cookies would be sent to the file store with every request.
+    expect(options).toBeUndefined();
   });
 
   test("names the missing setting when sign-in is not configured", async () => {
@@ -117,51 +98,5 @@ describe("setting up the sign-in library in the browser", () => {
     const { configureAuth } = await import("@/lib/auth/client");
 
     expect(() => configureAuth()).toThrow(/NEXT_PUBLIC_COGNITO_DOMAIN/);
-  });
-});
-
-describe("checking the session on the server", () => {
-  const request = () => new NextRequest("http://localhost:3000/");
-
-  test("a verified access token counts as signed in", async () => {
-    fetchServerSession.mockResolvedValue({
-      tokens: { accessToken: { toString: () => "access-token" } },
-    });
-    const { hasValidSession } = await import("@/lib/auth/server");
-
-    expect(await hasValidSession(request(), NextResponse.next())).toBe(true);
-    expect(fetchServerSession).toHaveBeenCalledWith("server-context");
-  });
-
-  test("no tokens means not signed in", async () => {
-    fetchServerSession.mockResolvedValue({ tokens: undefined });
-    const { hasValidSession } = await import("@/lib/auth/server");
-
-    expect(await hasValidSession(request(), NextResponse.next())).toBe(false);
-  });
-
-  test("a check that breaks never lets anyone through", async () => {
-    fetchServerSession.mockRejectedValue(new Error("invalid signature"));
-    const { hasValidSession } = await import("@/lib/auth/server");
-
-    expect(await hasValidSession(request(), NextResponse.next())).toBe(false);
-  });
-
-  test("with sign-in not configured, nobody counts as signed in", async () => {
-    configureEnvironment({});
-    const { hasValidSession } = await import("@/lib/auth/server");
-
-    expect(await hasValidSession(request(), NextResponse.next())).toBe(false);
-    expect(createServerRunner).not.toHaveBeenCalled();
-  });
-
-  test("the server runner is built once and reused", async () => {
-    fetchServerSession.mockResolvedValue({ tokens: undefined });
-    const { hasValidSession } = await import("@/lib/auth/server");
-
-    await hasValidSession(request(), NextResponse.next());
-    await hasValidSession(request(), NextResponse.next());
-
-    expect(createServerRunner).toHaveBeenCalledTimes(1);
   });
 });

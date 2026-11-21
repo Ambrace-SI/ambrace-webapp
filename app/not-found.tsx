@@ -9,9 +9,8 @@ import { HOME_PATH } from "@/lib/auth/routes";
 export const metadata: Metadata = { title: "Page not found" };
 
 /**
- * The safety net for "not found" raised outside the app frame. A mistyped
- * address normally lands on the page of the same name inside the frame, where
- * the side panel is.
+ * Every address that no page claims. The build writes this out as 404.html,
+ * which is what the file store answers with for anything it does not have.
  */
 export default function NotFound() {
   return (

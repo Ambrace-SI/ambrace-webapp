@@ -18,7 +18,7 @@ vi.mock("next/link", () => ({
   }) => <a href={href}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ id: "session-1" }),
+  useSearchParams: () => new URLSearchParams("id=session-1"),
 }));
 
 const getVivaSession = vi.fn();
