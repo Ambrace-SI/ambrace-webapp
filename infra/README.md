@@ -48,14 +48,16 @@ that any browser downloads.
 | API address, app address, Cognito IDs | SSM, `/ambrace/<env>/web/`                    |
 | Bucket name, distribution ID          | SSM, `/ambrace/<env>/web/hosting/`            |
 | AWS access for the pipeline           | Nowhere. A one-hour role through GitHub OIDC. |
-| Role ARN, account ID, region          | GitHub Environment variables (not secrets)    |
+| Role ARN, region                      | GitHub Environment variables (not secrets)    |
+| AWS account ID                        | `<env>.tfvars`, in this folder                |
 | Your laptop                           | `.env.local`, never committed                 |
 
 ## Connect GitHub (once per environment)
 
 See "The web app's pipeline" in `ambrace-backend/infra/bootstrap/README.md`. It
-creates the GitHub Environment and sets `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION` and
-`AWS_ACCOUNT_ID` on it.
+creates the GitHub Environment and sets `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION` on
+it. The account ID is not stored in GitHub: the pipeline reads it from
+`<env>.tfvars` and stops if the role it was given belongs to another account.
 
 ## First deployment of an environment
 

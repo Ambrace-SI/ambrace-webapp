@@ -8,8 +8,8 @@ name: Deploy (reusable)
 # one-hour credentials on the role in vars.AWS_DEPLOY_ROLE_ARN. The role is
 # defined in ambrace-backend/infra/bootstrap/web_deploy.tf.
 #
-# Settings: nothing about an environment is stored in GitHub beyond the role,
-# account and region. The build's settings and the bucket to publish to are
+# Settings: nothing about an environment is stored in GitHub beyond the role
+# and the region. The build's settings and the bucket to publish to are
 # read from SSM Parameter Store under /ambrace/<env>/web.
 #
 # The jobs that hold AWS credentials never install or run npm packages, and the
@@ -74,10 +74,9 @@ jobs:
         env:
           AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           AWS_REGION_VAR: ${{ vars.AWS_REGION }}
-          AWS_ACCOUNT_ID_VAR: ${{ vars.AWS_ACCOUNT_ID }}
         run: |
-          if [ -z "${AWS_DEPLOY_ROLE_ARN}" ] || [ -z "${AWS_REGION_VAR}" ] || [ -z "${AWS_ACCOUNT_ID_VAR}" ]; then
-            echo "Error: the GitHub Environment must define AWS_DEPLOY_ROLE_ARN, AWS_REGION and AWS_ACCOUNT_ID." >&2
+          if [ -z "${AWS_DEPLOY_ROLE_ARN}" ] || [ -z "${AWS_REGION_VAR}" ]; then
+            echo "Error: the GitHub Environment must define AWS_DEPLOY_ROLE_ARN and AWS_REGION." >&2
             echo "See infra/README.md, 'Connect GitHub'." >&2
             exit 1
           fi
@@ -101,15 +100,11 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: github-web-${{ inputs.tf_environment }}-${{ github.run_id }}
 
+      # Terraform refuses a wrong account too (allowed_account_ids); this says
+      # so before it starts, and shows who we are in the log.
       - name: Confirm the AWS account
-        env:
-          EXPECTED_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
         run: |
-          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          if [ "${ACTUAL_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]; then
-            echo "::error::Expected AWS account ${EXPECTED_ACCOUNT}, got ${ACTUAL_ACCOUNT}."
-            exit 1
-          fi
+          bash scripts/confirm-aws-account.sh "${TF_ENVIRONMENT}"
           aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table
 
       - name: Terraform init
@@ -270,7 +265,8 @@ jobs:
       id-token: write
 
     steps:
-      # Only for the script that checks the live site; it uses nothing but Node.
+      # Only for this repository's own two scripts: the account check (shell)
+      # and the live-site check (Node, no packages).
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -294,15 +290,10 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: github-web-publish-${{ inputs.tf_environment }}-${{ github.run_id }}
 
+      # No Terraform runs in this job, so this is the only thing that stops a
+      # GitHub Environment that was given another environment's role.
       - name: Confirm the AWS account
-        env:
-          EXPECTED_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
-        run: |
-          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          if [ "${ACTUAL_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]; then
-            echo "::error::Expected AWS account ${EXPECTED_ACCOUNT}, got ${ACTUAL_ACCOUNT}."
-            exit 1
-          fi
+        run: bash scripts/confirm-aws-account.sh "${TF_ENVIRONMENT}"
 
       - name: Find where to publish
         run: |
