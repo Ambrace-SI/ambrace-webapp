@@ -36,7 +36,7 @@ export function SignInForm() {
   const [formError, setFormError] = useState<string>();
   const [pending, setPending] = useState<Pending>(null);
 
-  /** A full page load, so the server-side gate sees the new session cookies. */
+  /** A full page load, so nothing remembered from the sign-in screen survives. */
   function enterApp() {
     window.location.assign(returnPath);
   }

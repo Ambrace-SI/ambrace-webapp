@@ -12,7 +12,11 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const signOut = vi.fn();
 vi.mock("aws-amplify/auth", () => ({ signOut: () => signOut() }));
-vi.mock("@/lib/auth/client", () => ({ configureAuth: vi.fn() }));
+const getAccessToken = vi.fn();
+vi.mock("@/lib/auth/client", () => ({
+  configureAuth: vi.fn(),
+  getAccessToken: () => getAccessToken(),
+}));
 
 const getMe = vi.fn();
 vi.mock("@/lib/api/me", () => ({ getMe: () => getMe() }));
@@ -69,6 +73,8 @@ function visit(pathname: string, search = "") {
 beforeEach(() => {
   router.replace.mockReset();
   getMe.mockReset();
+  getAccessToken.mockReset();
+  getAccessToken.mockResolvedValue("token");
   signOut.mockReset();
   signOut.mockResolvedValue(undefined);
   replaceLocation.mockReset();
@@ -169,4 +175,32 @@ test("a failed sign-out during cleanup still returns to sign-in", async () => {
   renderGate("profile");
 
   await waitFor(() => expect(replaceLocation).toHaveBeenCalledWith("/sign-in"));
+});
+
+test("someone with no session on this device goes to sign-in without waiting for the backend", async () => {
+  getAccessToken.mockResolvedValue(null);
+  // The backend never answers: asleep, slow or down.
+  getMe.mockReturnValue(new Promise(() => undefined));
+  visit("/v", "?id=abc");
+
+  renderGate("profile");
+
+  await waitFor(() =>
+    expect(replaceLocation).toHaveBeenCalledWith(
+      "/sign-in?next=%2Fv%3Fid%3Dabc",
+    ),
+  );
+  // There is no session to end.
+  expect(signOut).not.toHaveBeenCalled();
+  expect(screen.queryByText("The page")).toBeNull();
+});
+
+test("someone with no session is not told the backend is unreachable", async () => {
+  getAccessToken.mockResolvedValue(null);
+  getMe.mockRejectedValue(failure(503));
+
+  renderGate("profile");
+
+  await waitFor(() => expect(replaceLocation).toHaveBeenCalledWith("/sign-in"));
+  expect(screen.queryByText(/Your account is fine/)).toBeNull();
 });
