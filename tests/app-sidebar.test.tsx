@@ -72,11 +72,11 @@ vi.mock("@/lib/api/history", () => api);
 const leaveAmbrace = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/app/sign-out", () => ({ leaveAmbrace }));
 
-const toastError = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({
-  toast: { error: toastError },
-  Toaster: () => null,
-}));
+const { toast, toastError } = vi.hoisted(() => {
+  const toastError = vi.fn();
+  return { toastError, toast: Object.assign(vi.fn(), { error: toastError }) };
+});
+vi.mock("sonner", () => ({ toast, Toaster: () => null }));
 
 vi.mock("@/lib/api/me", () => ({
   ME_PATH: "/api/v1/me",
@@ -194,6 +194,7 @@ beforeEach(() => {
   address.push.mockReset();
   address.replace.mockReset();
   leaveAmbrace.mockReset();
+  toast.mockReset();
   toastError.mockReset();
   for (const mock of Object.values(api)) mock.mockReset();
   api.getHistory.mockResolvedValue(NEWEST);
@@ -261,13 +262,33 @@ describe("the list of past vivas", () => {
     expect(link.textContent).toMatch(/^Electricity21 Nov( \d{4})?$/);
   });
 
-  test("a viva that ended early is listed, but leads nowhere", async () => {
+  test("a viva that ended early is listed, and pressing it says there is no report", async () => {
     renderShell();
     await row(/Electricity/);
-
-    expect(screen.getByText("Motion")).toBeTruthy();
-    expect(screen.getByText(/Ended early/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Motion/ })).toBeNull();
+
+    await press(/Motion.*Ended early/);
+
+    expect(toast).toHaveBeenCalledWith(
+      "This viva ended early, so there's no report for it.",
+    );
+    expect(address.push).not.toHaveBeenCalled();
+  });
+
+  test("a viva still running says its report comes at the end", async () => {
+    api.getHistory.mockResolvedValue({
+      sessions: [viva("d", "Sound", { status: "in_progress" })],
+      next_cursor: null,
+    });
+    renderShell();
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /Sound.*In progress/ }));
+
+    expect(toast).toHaveBeenCalledWith(
+      "This viva is still in progress. Its report comes at the end.",
+    );
   });
 
   test("the report on screen is marked as the current one", async () => {

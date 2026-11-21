@@ -48,8 +48,8 @@ const GLIDE = { type: "spring", stiffness: 350, damping: 30 } as const;
  * The student's past vivas, newest first.
  *
  * Each row is the chapter, with when it was and how it went underneath. A
- * finished viva opens its report. One that ended early has no report, so it
- * is listed but does not pretend to lead anywhere. Any row can be renamed or
+ * finished viva opens its report. One that ended early has no report, so
+ * pressing it says so instead of leading to an empty page. Any row can be renamed or
  * deleted from the menu at its end.
  */
 export function HistoryList({ onNavigate }: { onNavigate: () => void }) {
@@ -269,10 +269,14 @@ function RowBody({
   );
 
   if (!row.hasReport) {
+    // Nothing to open, but a press still deserves an answer.
     return (
-      <div className="relative flex min-h-11 items-center px-3 py-2 pr-11 text-sm text-muted-foreground">
+      <SidebarMenuButton
+        className="text-muted-foreground hover:bg-transparent"
+        onClick={() => toast(row.whyNoReport)}
+      >
         {words}
-      </div>
+      </SidebarMenuButton>
     );
   }
 

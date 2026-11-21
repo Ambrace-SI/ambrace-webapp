@@ -8,6 +8,8 @@ export type VivaRow = {
   detail: string;
   /** Only a finished viva has a report to open. */
   hasReport: boolean;
+  /** What to tell a student who presses a viva that has no report. */
+  whyNoReport: string | null;
 };
 
 const SAME_YEAR = new Intl.DateTimeFormat("en-IN", {
@@ -41,6 +43,11 @@ function outcome(viva: VivaSessionSummary): string | null {
   return null;
 }
 
+const WHY_NO_REPORT: Record<string, string> = {
+  abandoned: "This viva ended early, so there's no report for it.",
+  in_progress: "This viva is still in progress. Its report comes at the end.",
+};
+
 export function describeViva(
   viva: VivaSessionSummary,
   now = new Date(),
@@ -52,6 +59,7 @@ export function describeViva(
       .filter(Boolean)
       .join(" · "),
     hasReport: viva.status === "completed",
+    whyNoReport: WHY_NO_REPORT[viva.status] ?? null,
   };
 }
 

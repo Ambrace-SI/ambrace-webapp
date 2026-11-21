@@ -43,6 +43,7 @@ describe("one row of the list", () => {
       title: "Electricity",
       detail: "21 Nov",
       hasReport: true,
+      whyNoReport: null,
     });
   });
 
@@ -51,6 +52,7 @@ describe("one row of the list", () => {
 
     expect(row.detail).toBe("21 Nov · Ended early");
     expect(row.hasReport).toBe(false);
+    expect(row.whyNoReport).toMatch(/ended early.*no report/);
   });
 
   test("a viva still running says so and has no report yet", () => {
@@ -58,6 +60,7 @@ describe("one row of the list", () => {
 
     expect(row.detail).toBe("21 Nov · In progress");
     expect(row.hasReport).toBe(false);
+    expect(row.whyNoReport).toMatch(/still in progress/);
   });
 
   test("the name it was given wins; the chapter is the fallback", () => {
