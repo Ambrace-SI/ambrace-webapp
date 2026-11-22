@@ -20,7 +20,7 @@ export default function NotFound() {
           href={HOME_PATH}
           className="inline-block rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <Logo surface="paper" priority />
+          <Logo surface="theme" priority />
         </Link>
       </header>
       <PageNotice

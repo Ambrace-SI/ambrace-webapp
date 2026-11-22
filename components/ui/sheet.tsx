@@ -6,28 +6,39 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A panel that slides in from the left edge over the page. From shadcn/ui,
- * cut down to the one use Ambrace has: the side panel on a phone.
+ * A panel that slides in over the page. From shadcn/ui, cut down to the two
+ * uses Ambrace has on a phone: the side panel from the left, and home's lists
+ * of choices from the bottom, where a thumb already is.
  */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
+const SIDES = {
+  left: "inset-y-0 left-0 h-full max-w-[85vw] border-r data-open:slide-in-from-left data-closed:slide-out-to-left",
+  bottom:
+    "inset-x-0 bottom-0 max-h-[85dvh] rounded-t-3xl border-t data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
+} as const;
+
 function SheetContent({
   className,
   children,
+  side = "left",
   ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content>) {
+}: React.ComponentProps<typeof SheetPrimitive.Content> & {
+  side?: keyof typeof SIDES;
+}) {
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay
         data-slot="sheet-overlay"
-        className="fixed inset-0 z-50 bg-foreground/25 supports-backdrop-filter:backdrop-blur-sm duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none"
+        className="fixed inset-0 z-50 bg-scrim duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none"
       />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-full max-w-[85vw] flex-col border-r border-border bg-popover text-sm text-popover-foreground shadow-lg duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:duration-200 data-closed:slide-out-to-left motion-reduce:animate-none",
+          "fixed z-50 flex flex-col border-border bg-popover text-sm text-popover-foreground shadow-lg duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-open:animate-in data-closed:animate-out data-closed:duration-200 motion-reduce:animate-none",
+          SIDES[side],
           className,
         )}
         {...props}

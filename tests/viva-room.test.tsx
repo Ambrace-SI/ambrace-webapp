@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Activity } from "react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { VivaRoom } from "@/components/viva/viva-room";
 import { APIError } from "@/lib/api/axios";
@@ -287,6 +287,78 @@ describe("after a viva that broke", () => {
 
     expect(engine.resetSession).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/setup for/)).toBeTruthy();
+  });
+});
+
+describe("the room is the home page", () => {
+  /** The engine's reset, here really clearing the store, as the engine's does. */
+  const resetThatClearsTheStore = () =>
+    engine.resetSession.mockImplementation(() => {
+      calls.push("reset");
+      useVivaStore.getState().resetSession();
+    });
+  // Undone after every test, even one that fails part way.
+  afterEach(() => {
+    engine.resetSession.mockImplementation(() => void calls.push("reset"));
+  });
+
+  /** The engine's state, as the voice engine would set it in the store. */
+  const engineSets = (
+    changes: Partial<ReturnType<typeof useVivaStore.getState>>,
+  ) => act(() => useVivaStore.setState(changes));
+
+  async function inLiveViva() {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+    engineSets({ sessionId: "session-1", sessionState: SessionState.ACTIVE });
+  }
+
+  test("when the engine ends a viva early and heads home, the student is back at the welcome", async () => {
+    // The engine sends the student to "/", which is this page, so nothing
+    // is unmounted: the room has to notice and step back itself.
+    await inLiveViva();
+    resetThatClearsTheStore();
+
+    engineSets({
+      sessionState: SessionState.IDLE,
+      error: "Microphone access is blocked.",
+    });
+
+    expect(await screen.findByText(/setup for/)).toBeTruthy();
+    expect(screen.queryByText(/^live:/)).toBeNull();
+    expect(engine.resetSession).toHaveBeenCalled();
+    // The reason stays for the welcome screen to show.
+    expect(useVivaStore.getState().error).toBe("Microphone access is blocked.");
+    expect(wholeScreen).toHaveBeenLastCalledWith(false);
+    expect(listRefreshed).toHaveBeenCalledWith({ queryKey: ["history"] });
+  });
+
+  test("the quiet moment before the engine starts is not mistaken for heading home", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    // The store is still idle until the engine begins connecting.
+    engineSets({ sessionId: "session-1", sessionState: SessionState.IDLE });
+
+    expect(screen.getByText("live: Science / Cell")).toBeTruthy();
+  });
+
+  test("going back by choice does not carry the reason the student already read", async () => {
+    await inLiveViva();
+    resetThatClearsTheStore();
+    engineSets({
+      sessionState: SessionState.ERROR,
+      error: "The line dropped.",
+    });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "choose again" }));
+
+    expect(screen.getByText(/setup for/)).toBeTruthy();
+    expect(useVivaStore.getState().error).toBeNull();
   });
 });
 

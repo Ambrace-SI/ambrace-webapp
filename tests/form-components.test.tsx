@@ -10,6 +10,7 @@ import { GoogleButton, OrDivider } from "@/components/auth/google-button";
 import { PasswordChecklist } from "@/components/auth/password-checklist";
 import { Logo } from "@/components/brand/logo";
 import { Orbit } from "@/components/brand/orbit";
+import { WelcomeMark } from "@/components/brand/welcome-mark";
 import { ChoiceChips } from "@/components/forms/choice-chips";
 import {
   FormMessage,
@@ -425,6 +426,25 @@ describe("brand pieces", () => {
     );
   });
 
+  test("the wordmark alone, without the symbol, comes from the kit's wordmark files", () => {
+    render(<Logo surface="paper" variant="wordmark" />);
+
+    expect(screen.getByText("Ambrace").getAttribute("data-src")).toBe(
+      "/brand/ambrace-lowercase-wordmark.svg",
+    );
+  });
+
+  test("on a surface that follows the theme, it carries both colourways and is named once", () => {
+    const { container } = render(<Logo surface="theme" />);
+
+    expect(screen.getByRole("img", { name: "Ambrace" })).toBeTruthy();
+    const files = [...container.querySelectorAll("[data-src]")];
+    expect(files.map((file) => file.getAttribute("data-src"))).toEqual([
+      "/brand/ambrace-lowercase-horizontal.svg",
+      "/brand/ambrace-lowercase-horizontal-reversed.svg",
+    ]);
+  });
+
   test("the orbit is decoration, hidden from screen readers", () => {
     const { container } = render(<Orbit />);
 
@@ -442,6 +462,13 @@ describe("brand pieces", () => {
     expect(container.querySelectorAll(".animate-breathe")).toHaveLength(1);
   });
 
+  test("the inner orbit is drawn in the muted tone, so it shows on every surface", () => {
+    const { container } = render(<Orbit />);
+    const ring = container.querySelector('circle[r="20"]');
+
+    expect(ring?.getAttribute("stroke")).toBe("var(--muted-foreground)");
+  });
+
   test("the orbit can be held still", () => {
     const { container } = render(<Orbit breathing={false} />);
 
@@ -449,16 +476,94 @@ describe("brand pieces", () => {
   });
 });
 
+describe("the welcome mark", () => {
+  test("is decoration, hidden from screen readers", () => {
+    const { container } = render(<WelcomeMark />);
+
+    expect(container.firstElementChild?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+  });
+
+  test("greets once, then only the student's point keeps moving", () => {
+    const { container } = render(<WelcomeMark />);
+    const ember = container.querySelectorAll('[fill="var(--ember)"]');
+
+    expect(container.querySelectorAll(".animate-greet-left")).toHaveLength(1);
+    expect(container.querySelectorAll(".animate-greet-right")).toHaveLength(1);
+    expect(container.querySelectorAll(".animate-arrive")).toHaveLength(1);
+    expect(ember).toHaveLength(1);
+    expect(ember[0].getAttribute("class")).toContain("animate-breathe");
+  });
+
+  test("draws its inner orbit in the muted tone", () => {
+    const { container } = render(<WelcomeMark />);
+
+    expect(
+      container.querySelector('circle[r="20"]')?.getAttribute("stroke"),
+    ).toBe("var(--muted-foreground)");
+  });
+});
+
 describe("the signed-out frame", () => {
-  test("is dark, and holds the form in the page's main region", () => {
-    const { container } = render(
+  const renderShell = () =>
+    render(
       <AuthShell>
         <p>The form</p>
       </AuthShell>,
     );
 
-    expect(container.firstElementChild?.className).toContain("dark");
+  test("follows the student's theme, and holds the form in the page's main region", () => {
+    const { container } = renderShell();
+
+    // Not forced to Ink any more: Paper or Ink, as the student chose.
+    expect(container.firstElementChild?.className).not.toMatch(/\bdark\b/);
     expect(within(screen.getByRole("main")).getByText("The form")).toBeTruthy();
+  });
+
+  test("the form sits in a quiet glass card", () => {
+    renderShell();
+
+    const card = screen.getByText("The form").closest("[data-slot=auth-card]");
+    expect(card).toBeTruthy();
+    // The card is inside the main region, so the form is still found there.
+    expect(screen.getByRole("main").contains(card)).toBe(true);
+  });
+
+  test("is headed by the text-only wordmark, in both colourways", () => {
+    const { container } = renderShell();
+
+    expect(screen.getByRole("img", { name: "Ambrace" })).toBeTruthy();
+    expect(
+      [...container.querySelectorAll("[data-src]")].map((file) =>
+        file.getAttribute("data-src"),
+      ),
+    ).toEqual([
+      "/brand/ambrace-lowercase-wordmark.svg",
+      "/brand/ambrace-lowercase-wordmark-reversed.svg",
+    ]);
+  });
+
+  test("greets with the animated mark and the new words, once each", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelectorAll(".animate-greet-left")).toHaveLength(1);
+    expect(screen.getAllByText("Learn differently.")).toHaveLength(1);
+    expect(
+      screen.getAllByText(
+        "Spend 10 minutes a day with Ambrace, and discover how you learn best.",
+      ),
+    ).toHaveLength(1);
+    // The form's own title stays the page's one top-level heading.
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
+  test("signs off with the company's name at the foot", () => {
+    renderShell();
+
+    expect(screen.getByRole("contentinfo").textContent).toBe(
+      "Ambrace Super Intelligence",
+    );
   });
 
   test("has no Ember button: the student has not arrived yet", () => {

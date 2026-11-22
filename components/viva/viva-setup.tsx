@@ -1,31 +1,29 @@
 "use client";
 
-import { Loader2Icon, PlusIcon } from "lucide-react";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { XIcon } from "lucide-react";
+import type { CSSProperties, FormEvent } from "react";
 
+import { WelcomeMark } from "@/components/brand/welcome-mark";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ENTIRE_CHAPTER, validCustomTopic } from "@/lib/curriculum/selection";
+import { ChoiceBar } from "@/components/viva/choice-bar";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
-import { cn } from "@/lib/utils";
-import type { Profile } from "@/types/profile";
-import { AVAILABLE_VOICES } from "@/types/viva";
+import { useVivaStore } from "@/lib/store/viva-store";
+import { BOARD_LABELS, type Profile } from "@/types/profile";
+import { DEFAULT_VOICE } from "@/types/viva";
 
 export type VivaChoice = { selection: CurriculumSelection; voiceName: string };
 
-const MAX_OWN_TOPICS = 20;
-
 /**
- * Choosing what to talk about.
+ * Home: a welcome, and everything needed to begin.
  *
- * The student answers one question at a time, and the next only appears once
- * the one before it is answered: subject, then chapter, then how much of it.
- * Nothing is hidden behind a dropdown, because on a phone every hidden option
- * costs a tap and a scroll. Name and class are not asked: we already know
- * them. The side panel is the way to anywhere else. The only warm thing on
- * the screen is the button that begins.
+ * The middle of the screen greets the student and does nothing else. What
+ * the viva is about is chosen along the bottom, where a chat app keeps its
+ * message box, so there is one page to land on and no form to read. Name and
+ * class are not asked: we already know them. Nor is the examiner's voice:
+ * every viva uses DEFAULT_VOICE, to keep starting simple. The side panel is
+ * the way to anywhere else.
  */
 export function VivaSetup({
   profile,
@@ -39,83 +37,84 @@ export function VivaSetup({
   onStart: (choice: VivaChoice) => void;
 }) {
   const setup = useVivaSetup(profile.class_level);
-  const firstName = profile.name.split(/\s+/)[0];
 
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!setup.resolved || starting) return;
-    onStart({ selection: setup.resolved, voiceName: setup.voiceName });
+    onStart({ selection: setup.resolved, voiceName: DEFAULT_VOICE });
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-1 flex-col">
-      <main className="animate-rise mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 pt-10 pb-12 sm:px-10 sm:pt-14">
-        <div className="flex flex-col gap-3">
-          <p className="label-mono text-muted-foreground">
-            Class {profile.class_level} · {firstName}
-          </p>
-          <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
-            What shall we talk through?
-          </h1>
-        </div>
-
-        {setup.catalog === "loading" ? <ChoicesOutline /> : null}
-
-        {setup.catalog === "failed" ? (
-          <FormMessage tone="error">
-            <p>We couldn&apos;t load your subjects.</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="touch"
-              className="mt-3"
-              onClick={setup.retryCatalog}
-            >
-              Try again
-            </Button>
-          </FormMessage>
-        ) : null}
-
-        {setup.catalog === "ready" ? (
-          <Choices setup={setup} disabled={starting} />
-        ) : null}
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+      <main className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-10 text-center">
+        <WelcomeMark className="w-48 sm:w-60" />
+        <Greeting profile={profile} line={lineFor(setup, starting)} />
       </main>
 
       {/* Always within reach of a thumb, and always saying what happens next. */}
-      <footer className="sticky bottom-0 border-t border-border bg-background">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-6 py-4 sm:px-10">
-          {error ? <FormMessage tone="error">{error}</FormMessage> : null}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p
-              className="min-w-0 text-sm text-pretty text-muted-foreground"
-              role="status"
-            >
-              {summaryOf(setup)}
-            </p>
-            <Button
-              type="submit"
-              variant="ember"
-              size="touch"
-              className="shrink-0 sm:min-w-40"
-              disabled={!setup.resolved || starting}
-              aria-busy={starting}
-            >
-              {starting ? (
-                <>
-                  <Loader2Icon className="animate-spin" aria-hidden="true" />
-                  Starting
-                </>
-              ) : (
-                "Start viva"
-              )}
-            </Button>
-          </div>
-        </div>
-      </footer>
+      <div className="sticky bottom-0 mx-auto flex w-full max-w-4xl flex-col gap-3 bg-background px-3 pt-2 pb-4 sm:px-6 sm:pb-6">
+        <LastVivaNotice />
+        <CatalogNotice setup={setup} />
+        {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+        <ChoiceBar setup={setup} starting={starting} />
+        <p
+          className="text-center text-sm text-pretty text-muted-foreground"
+          role="status"
+        >
+          {summaryOf(setup)}
+        </p>
+      </div>
     </form>
   );
 }
 
+/** Each line arrives a beat after the one before, under the mark. */
+const after = (milliseconds: number): CSSProperties => ({
+  animationDelay: `${milliseconds}ms`,
+});
+
+function Greeting({ profile, line }: { profile: Profile; line: string }) {
+  const firstName = profile.name.trim().split(/\s+/)[0];
+  const details = [
+    `Class ${profile.class_level}`,
+    profile.board ? BOARD_LABELS[profile.board] : null,
+    profile.school_name,
+  ].filter(Boolean);
+
+  return (
+    <div className="flex max-w-2xl flex-col items-center gap-3">
+      <p
+        className="label-mono animate-rise text-muted-foreground"
+        style={after(500)}
+      >
+        {details.join(" · ")}
+      </p>
+      <h1
+        className="animate-rise text-5xl font-light tracking-tight sm:text-6xl"
+        style={after(620)}
+      >
+        Hello, {firstName}.
+      </h1>
+      <p
+        className="animate-rise text-lg text-pretty text-muted-foreground"
+        style={after(780)}
+      >
+        {line}
+      </p>
+    </div>
+  );
+}
+
+/** The line under the greeting answers what has been chosen so far. */
+function lineFor(setup: VivaSetup, starting: boolean): string {
+  if (starting) return "Finding your examiner…";
+  if (setup.chapter) return `${setup.chapter.name}. Ready when you are.`;
+  if (setup.subject)
+    return `${setup.subject.name} it is. Which chapter shall we talk through?`;
+  return "How are you doing today?";
+}
+
+/** The line under the bar always says what happens next. */
 function summaryOf(setup: VivaSetup): string {
   if (setup.catalog !== "ready") return "Getting your subjects ready.";
   if (!setup.subject) return "Choose a subject to begin.";
@@ -123,294 +122,58 @@ function summaryOf(setup: VivaSetup): string {
   return "You'll speak with your examiner. Your browser will ask for the microphone.";
 }
 
-function Choices({ setup, disabled }: { setup: VivaSetup; disabled: boolean }) {
-  const id = useId();
-
-  if (setup.subjects.length === 0) {
+/** Only shown when the subjects could not be fetched, or there are none. */
+function CatalogNotice({ setup }: { setup: VivaSetup }) {
+  if (setup.catalog === "failed")
+    return (
+      <FormMessage tone="error">
+        <p>We couldn&apos;t load your subjects.</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="touch"
+          className="mt-3"
+          onClick={setup.retryCatalog}
+        >
+          Try again
+        </Button>
+      </FormMessage>
+    );
+  if (setup.catalog === "ready" && setup.subjects.length === 0)
     return (
       <FormMessage tone="info">
         There are no subjects for Class {setup.selection.classLevel} yet.
       </FormMessage>
     );
-  }
-
-  return (
-    <>
-      <Question legend="Subject">
-        <div className="flex flex-wrap gap-2">
-          {setup.subjects.map((subject) => (
-            <Pill
-              key={subject.id}
-              type="radio"
-              name={`${id}-subject`}
-              checked={setup.selection.subjectId === subject.id}
-              disabled={disabled}
-              onChange={() =>
-                setup.select({ type: "subject", value: subject.id })
-              }
-            >
-              {subject.name}
-            </Pill>
-          ))}
-        </div>
-      </Question>
-
-      {setup.subject ? (
-        // Keyed by subject so the list arrives afresh when the subject changes.
-        <Question key={setup.subject.id} legend="Chapter">
-          <ol className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
-            {setup.chapters.map((chapter, index) => (
-              <li
-                key={chapter.id}
-                className="border-b border-border last:border-b-0"
-              >
-                <label className="flex min-h-12 cursor-pointer items-center gap-4 px-4 py-2.5 transition-colors hover:bg-muted has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 has-focus-visible:ring-inset has-disabled:cursor-default has-disabled:opacity-60">
-                  <input
-                    type="radio"
-                    name={`${id}-chapter`}
-                    className="sr-only"
-                    checked={setup.chosen?.chapterId === chapter.id}
-                    disabled={disabled}
-                    onChange={() =>
-                      setup.select({ type: "chapter", value: chapter.id })
-                    }
-                  />
-                  <span
-                    className="label-mono w-5 shrink-0 opacity-60"
-                    aria-hidden="true"
-                  >
-                    {index + 1}
-                  </span>
-                  <span>{chapter.name}</span>
-                </label>
-              </li>
-            ))}
-          </ol>
-        </Question>
-      ) : null}
-
-      {setup.chapter && setup.chosen ? (
-        <>
-          <Focus key={setup.chapter.id} setup={setup} disabled={disabled} />
-          <Question
-            legend="Examiner's voice"
-            hint="Pick the one that's easiest for you to follow."
-          >
-            <div className="flex flex-wrap gap-2">
-              {AVAILABLE_VOICES.map((voice) => (
-                <Pill
-                  key={voice.value}
-                  type="radio"
-                  name={`${id}-voice`}
-                  checked={setup.voiceName === voice.value}
-                  disabled={disabled}
-                  onChange={() => setup.setVoiceName(voice.value)}
-                >
-                  {voice.value}
-                </Pill>
-              ))}
-            </div>
-          </Question>
-        </>
-      ) : null}
-    </>
-  );
+  return null;
 }
 
 /**
- * How much of the chapter to cover. "Whole chapter" is the answer unless the
- * student narrows it, so doing nothing here is a valid choice.
+ * When a viva breaks (a blocked microphone, a lost line) the voice engine
+ * brings the student back here. Without this they would land on the welcome
+ * with no idea why, so the reason stays until it is dismissed or a new viva
+ * begins.
  */
-function Focus({ setup, disabled }: { setup: VivaSetup; disabled: boolean }) {
-  const [draft, setDraft] = useState("");
-  const [draftError, setDraftError] = useState<string | null>(null);
-  const chapter = setup.chapter!;
-  const chosen = setup.chosen!;
-  const whole = !chosen.topicIds.length && !chosen.customTopics.length;
-  const errorId = useId();
-
-  function addOwnTopic() {
-    const name = draft.trim();
-    if (!name) return;
-    if (!validCustomTopic(name)) {
-      setDraftError("Keep a topic to one line of 100 characters or fewer.");
-      return;
-    }
-    if (chosen.customTopics.length >= MAX_OWN_TOPICS) {
-      setDraftError(`You can add up to ${MAX_OWN_TOPICS} topics of your own.`);
-      return;
-    }
-    setup.select({ type: "custom-topic", chapterId: chapter.id, value: name });
-    setDraft("");
-    setDraftError(null);
-  }
+function LastVivaNotice() {
+  const reason = useVivaStore((state) => state.error);
+  const setError = useVivaStore((state) => state.setError);
+  if (!reason) return null;
 
   return (
-    <Question
-      legend="Focus"
-      hint="Stay on the whole chapter, or pick the parts you want to be asked about."
-    >
-      <div className="flex flex-wrap gap-2">
-        <Pill
-          type="checkbox"
-          checked={whole}
-          disabled={disabled}
-          onChange={() =>
-            setup.select({
-              type: "topic",
-              chapterId: chapter.id,
-              value: ENTIRE_CHAPTER,
-            })
-          }
-        >
-          Whole chapter
-        </Pill>
-        {chapter.topics.map((topic) => (
-          <Pill
-            key={topic.id}
-            type="checkbox"
-            checked={chosen.topicIds.includes(topic.id)}
-            disabled={disabled}
-            onChange={() =>
-              setup.select({
-                type: "topic",
-                chapterId: chapter.id,
-                value: topic.id,
-              })
-            }
-          >
-            {topic.name}
-          </Pill>
-        ))}
-        {chosen.customTopics.map((name) => (
-          <Pill
-            key={name}
-            type="checkbox"
-            checked
-            disabled={disabled}
-            onChange={() =>
-              setup.select({
-                type: "remove-custom-topic",
-                chapterId: chapter.id,
-                value: name,
-              })
-            }
-          >
-            {name}
-          </Pill>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        <Input
-          aria-label="Add a topic of your own"
-          aria-invalid={draftError ? true : undefined}
-          aria-describedby={draftError ? errorId : undefined}
-          placeholder="Add a topic of your own"
-          className="h-11 min-w-0 px-3.5 md:text-base"
-          value={draft}
-          maxLength={120}
-          disabled={disabled}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setDraftError(null);
-          }}
-          onKeyDown={(event) => {
-            // Enter adds the topic; it must not start the viva.
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            addOwnTopic();
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="touch"
-          onClick={addOwnTopic}
-          disabled={disabled || !draft.trim()}
-        >
-          <PlusIcon aria-hidden="true" />
-          Add
-        </Button>
-      </div>
-      {draftError ? (
-        <p id={errorId} role="alert" className="text-sm text-destructive">
-          {draftError}
+    <FormMessage tone="error">
+      <div className="flex items-start justify-between gap-3">
+        <p>
+          <span className="font-medium">Your viva stopped.</span> {reason}
         </p>
-      ) : null}
-    </Question>
-  );
-}
-
-function Question({
-  legend,
-  hint,
-  children,
-}: {
-  legend: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <fieldset className="animate-rise flex min-w-0 flex-col gap-3">
-      <legend className="mb-3 flex flex-col gap-1">
-        <span className="font-heading text-lg">{legend}</span>
-        {hint ? (
-          <span className="text-sm text-muted-foreground">{hint}</span>
-        ) : null}
-      </legend>
-      {children}
-    </fieldset>
-  );
-}
-
-/**
- * One choice the size of its own words. It is a real radio button or checkbox
- * underneath, so arrow keys, Space and screen readers work without any code.
- */
-function Pill({
-  children,
-  className,
-  ...input
-}: {
-  type: "radio" | "checkbox";
-  name?: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: () => void;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center rounded-lg border border-input bg-card px-4 py-2 text-base transition-colors hover:border-foreground/40 has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 has-disabled:cursor-default has-disabled:opacity-60 active:scale-[0.98]",
-        className,
-      )}
-    >
-      <input className="sr-only" {...input} />
-      {children}
-    </label>
-  );
-}
-
-/**
- * The shape of the choices while the subject list downloads. The line beside
- * the Start button already says what is happening, so this stays silent.
- */
-function ChoicesOutline() {
-  return (
-    <div className="flex flex-col gap-3" aria-hidden="true">
-      <div className="h-6 w-24 animate-pulse rounded bg-muted" />
-      <div className="flex flex-wrap gap-2">
-        {[28, 20, 24, 16, 32].map((width, index) => (
-          <div
-            key={index}
-            className="h-11 animate-pulse rounded-lg bg-muted"
-            style={{ width: `${width * 4}px` }}
-          />
-        ))}
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={() => setError(null)}
+          className="-m-2 flex size-9 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <XIcon className="size-4" aria-hidden="true" />
+        </button>
       </div>
-    </div>
+    </FormMessage>
   );
 }

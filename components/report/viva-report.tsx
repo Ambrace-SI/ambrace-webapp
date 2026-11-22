@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { httpStatus } from "@/lib/api/errors";
-import { HOME_PATH, REPORT_ID_PARAM, VIVA_PATH } from "@/lib/auth/routes";
+import { HOME_PATH, REPORT_ID_PARAM } from "@/lib/auth/routes";
 import { useVivaResult } from "@/lib/hooks/use-viva-result";
 
 const DATE = new Intl.DateTimeFormat("en-IN", {
@@ -163,7 +163,7 @@ function Points({
 function StartAnother() {
   return (
     <Button asChild variant="ember" size="touch">
-      <Link href={VIVA_PATH}>Start another viva</Link>
+      <Link href={HOME_PATH}>Start another viva</Link>
     </Button>
   );
 }

@@ -28,7 +28,7 @@ import { BOARD_LABELS } from "@/types/profile";
 
 /**
  * Who is signed in, at the foot of the side panel, with the way to their
- * settings and the way out.
+ * settings and the way out. The theme is in Settings, under Appearance.
  *
  * Signing out sits one step away, inside a menu, so it is never pressed by a
  * thumb reaching for something else.

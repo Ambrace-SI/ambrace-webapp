@@ -103,7 +103,7 @@ describe("a finished viva", () => {
       (
         await screen.findByRole("link", { name: "Start another viva" })
       ).getAttribute("href"),
-    ).toBe("/viva");
+    ).toBe("/");
     expect(
       screen.getByRole("link", { name: "Home" }).getAttribute("href"),
     ).toBe("/");

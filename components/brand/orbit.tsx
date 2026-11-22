@@ -41,7 +41,7 @@ export function Orbit({
         cy="60"
         r="20"
         fill="none"
-        stroke="var(--border)"
+        stroke="var(--muted-foreground)"
         strokeWidth="0.75"
       />
       <circle

@@ -6,6 +6,7 @@ import { Tabs } from "radix-ui";
 import type { ComponentType } from "react";
 
 import { AccountSettings } from "@/components/settings/account/account-settings";
+import { AppearanceSettings } from "@/components/settings/appearance/appearance-settings";
 import { ProfileSettings } from "@/components/settings/profile/profile-settings";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import { settingsWindow } from "@/lib/settings/settings-window";
 /** What each part of Settings shows. A new part must be given one here. */
 const PANELS: Record<SettingsSectionId, ComponentType> = {
   profile: ProfileSettings,
+  appearance: AppearanceSettings,
   account: AccountSettings,
 };
 

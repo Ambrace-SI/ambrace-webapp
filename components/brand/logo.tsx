@@ -3,35 +3,79 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
+ * The supplied logo files, by layout and colourway. "horizontal" is the
+ * symbol with the word; "wordmark" is the word alone, for places where the
+ * symbol already appears nearby (the logo kit's own guidance).
+ */
+const FILES = {
+  horizontal: {
+    ink: "/brand/ambrace-lowercase-horizontal-reversed.svg",
+    paper: "/brand/ambrace-lowercase-horizontal.svg",
+  },
+  wordmark: {
+    ink: "/brand/ambrace-lowercase-wordmark-reversed.svg",
+    paper: "/brand/ambrace-lowercase-wordmark.svg",
+  },
+} as const;
+
+/**
  * The Ambrace logo, always from the supplied files and never redrawn.
  *
  * The product uses the lowercase wordmark: the logo kit describes it as the
  * softer, app-like version, and saves the capital one for formal surfaces.
- * `surface` says what the logo sits on, so the right colourway is chosen.
+ * `surface` says what the logo sits on, so the right colourway is chosen:
+ * "ink" and "paper" for surfaces that never change, and "theme" for those
+ * that follow light and dark, like the side panel.
  */
 export function Logo({
   surface,
+  variant = "horizontal",
   className,
   priority = false,
 }: {
-  surface: "ink" | "paper";
+  surface: "ink" | "paper" | "theme";
+  variant?: keyof typeof FILES;
   className?: string;
   priority?: boolean;
 }) {
-  const file =
-    surface === "ink"
-      ? "/brand/ambrace-lowercase-horizontal-reversed.svg"
-      : "/brand/ambrace-lowercase-horizontal.svg";
+  const files = FILES[variant];
+  // The kit's minimum width for the horizontal logo is 120px.
+  const sized = cn("h-auto w-[148px]", className);
 
+  if (surface !== "theme") {
+    return (
+      <Image
+        src={files[surface]}
+        alt="Ambrace"
+        width={148}
+        height={38}
+        priority={priority}
+        className={sized}
+      />
+    );
+  }
+
+  // Both colourways are sent and the stylesheet shows one, so the right logo
+  // is there from the first paint, with no flash when the theme is read. They
+  // are named once, as a single image, so a link around them reads "Ambrace".
   return (
-    <Image
-      src={file}
-      alt="Ambrace"
-      width={148}
-      height={38}
-      priority={priority}
-      // The kit's minimum width for the horizontal logo is 120px.
-      className={cn("h-auto w-[148px]", className)}
-    />
+    <span role="img" aria-label="Ambrace" className="inline-flex">
+      <Image
+        src={files.paper}
+        alt=""
+        width={148}
+        height={38}
+        priority={priority}
+        className={cn(sized, "dark:hidden")}
+      />
+      <Image
+        src={files.ink}
+        alt=""
+        width={148}
+        height={38}
+        priority={priority}
+        className={cn(sized, "hidden dark:block")}
+      />
+    </span>
   );
 }

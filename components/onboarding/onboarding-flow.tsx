@@ -169,7 +169,7 @@ function OnboardingSteps({
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-6 py-6 sm:px-10">
-        <Logo surface="paper" priority />
+        <Logo surface="theme" priority />
         <p className="label-mono text-muted-foreground" aria-live="polite">
           Step {step === "basics" ? "1" : "2"} of 2
         </p>

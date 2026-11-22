@@ -2,15 +2,19 @@
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
+import { useTheme } from "@/lib/hooks/use-theme";
+
 /**
  * Short messages that appear at the edge of the screen and leave by
- * themselves. From shadcn/ui. The app screens are always Paper, so the theme
- * is fixed to light and the colours come from the brand tokens.
+ * themselves. From shadcn/ui. They follow the student's theme, and their
+ * colours come from the brand tokens, so they match the page in both.
  */
 function Toaster(props: ToasterProps) {
+  const { resolved } = useTheme();
+
   return (
     <Sonner
-      theme="light"
+      theme={resolved}
       position="top-center"
       className="toaster group"
       style={

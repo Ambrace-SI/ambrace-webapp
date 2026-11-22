@@ -31,6 +31,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-scrim: var(--scrim);
+  --color-surface: var(--surface);
+  --color-surface-active: var(--surface-active);
   --color-ember: var(--ember);
   --color-ember-foreground: var(--ember-foreground);
   --color-ember-text: var(--ember-text);
@@ -71,6 +74,15 @@
  * for the student in the logo. Everyday emphasis uses Ink on Paper and Mist on
  * Ink, so Ember stays rare enough to mean something.
  *
+ * Surface is what a control sits on (the choice bar on home and its lists),
+ * and surface-active is that control open or hovered. Both are kept to the
+ * agreed palette: on Paper the bar is Paper itself, set apart by its border;
+ * on Ink it is Graphite, and an open control drops back to Ink.
+ *
+ * The scrim dims the page behind a window (Settings, a sheet). It is Ink in
+ * both themes, never a tint of the text colour, which on Ink is light and
+ * would turn a dark page milky. It is flat, with no blur.
+ *
  * No gradients and no glows anywhere: flat colour and space carry the calm.
  */
 :root {
@@ -93,6 +105,13 @@
   --border: #cfcdd8; /* Orbit light */
   --input: #cfcdd8;
   --ring: #0b0b10;
+  --surface: #f4f3ef; /* Paper */
+  --surface-active: #cfcdd8; /* Orbit light */
+  --scrim: rgb(11 11 16 / 0.35); /* Ink, dimming the page behind a window */
+  --scrollbar: #cfcdd8; /* Orbit light, the same tone as the borders */
+  /* The hairline of light along the top of a glass card. Nothing in the
+     palette is lighter than Paper, so on Paper it is white, kept faint. */
+  --glass-highlight: rgb(255 255 255 / 0.6);
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10; /* never white on Ember: 2.8:1 fails, Ink is 6.9:1 */
@@ -137,6 +156,12 @@
   --border: #3a3946; /* Orbit dark */
   --input: #3a3946;
   --ring: #ecebf2;
+  --surface: #1c1b25; /* Graphite */
+  --surface-active: #0b0b10; /* Ink */
+  /* Ink again, stronger: a lighter scrim would wash a dark page out. */
+  --scrim: rgb(11 11 16 / 0.72);
+  --scrollbar: #3a3946; /* Orbit dark */
+  --glass-highlight: rgb(236 235 242 / 0.06); /* Mist, barely there */
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10;
@@ -185,6 +210,36 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /*
+   * Scrollbars: the side panel's thin bar, everywhere a list or panel
+   * scrolls (the choice lists, Settings, the live transcript). No track,
+   * in the border tone of the theme, so it shows that something scrolls
+   * without a heavy grey bar beside it.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar) transparent;
+  }
+
+  /* Browsers that cannot read the two lines above (older Safari) get the
+     same look the old way. Others skip this, since Chrome would otherwise
+     mix the two. */
+  @supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 9999px;
+      background: var(--scrollbar) padding-box;
+    }
+  }
 }
 
 @layer utilities {
@@ -198,12 +253,14 @@
 }
 
 /*
- * Motion. Four movements, each with one meaning, and nothing else moves.
+ * Motion. Five movements, each with one meaning, and nothing else moves.
  *
  *   rise     Content arriving: a screen or a step settles into place once.
  *   breathe  Someone is present and being listened to: the student's point.
  *   speak    The examiner is talking: the arcs of the mark swell.
  *   turn     Something is being worked out: the inner orbit turns.
+ *   greet    Being welcomed, once, on home: the arcs open like arms and the
+ *            student's point travels in to its place. Then only breathe runs.
  *
  * In a viva only one of breathe, speak and turn runs at a time, so motion
  * itself says whose turn it is.
@@ -215,6 +272,10 @@
   --animate-breathe: breathe 3.6s ease-in-out infinite;
   --animate-speak: speak 1.4s ease-in-out infinite;
   --animate-turn: turn 9s linear infinite;
+  --animate-greet-left: greet-left 1.6s cubic-bezier(0.16, 1, 0.3, 1) 150ms both;
+  --animate-greet-right: greet-right 1.6s cubic-bezier(0.16, 1, 0.3, 1) 150ms
+    both;
+  --animate-arrive: arrive 1.7s cubic-bezier(0.45, 0, 0.15, 1) 350ms both;
 
   @keyframes rise {
     from {
@@ -242,6 +303,47 @@
   @keyframes turn {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes greet-left {
+    0% {
+      opacity: 0;
+      transform: rotate(0deg);
+    }
+    55% {
+      opacity: 1;
+      transform: rotate(-9deg);
+    }
+    100% {
+      opacity: 1;
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes greet-right {
+    0% {
+      opacity: 0;
+      transform: rotate(0deg);
+    }
+    55% {
+      opacity: 1;
+      transform: rotate(9deg);
+    }
+    100% {
+      opacity: 1;
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: rotate(-300deg);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(0deg);
     }
   }
 

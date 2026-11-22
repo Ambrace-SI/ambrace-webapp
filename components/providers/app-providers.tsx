@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { ThemeSync } from "@/components/theme/theme-sync";
 import { setTokenGetter, setUnauthorizedHandler } from "@/lib/api/axios";
 import { isWorthRetrying } from "@/lib/api/errors";
 import { ME_PATH } from "@/lib/api/me";
@@ -44,6 +45,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeSync />
+      {children}
+    </QueryClientProvider>
   );
 }

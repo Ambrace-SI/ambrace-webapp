@@ -52,7 +52,7 @@ export function VoiceOrb({
         cy="60"
         r="20"
         fill="none"
-        stroke="var(--border)"
+        stroke="var(--muted-foreground)"
         strokeWidth="0.75"
         strokeDasharray={working ? "3 5" : undefined}
         className={cn(working && "animate-turn")}

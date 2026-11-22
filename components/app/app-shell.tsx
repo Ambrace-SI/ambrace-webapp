@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={HOME_PATH}
                 className="rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <Logo surface="paper" className="w-[120px]" priority />
+                <Logo surface="theme" className="w-[120px]" priority />
               </Link>
             </header>
           )}
