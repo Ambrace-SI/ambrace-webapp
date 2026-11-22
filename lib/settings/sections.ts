@@ -1,4 +1,9 @@
-import { ShieldCheckIcon, UserRoundIcon, type LucideIcon } from "lucide-react";
+import {
+  ShieldCheckIcon,
+  SunMoonIcon,
+  UserRoundIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * Every part of Settings, in the order they are listed.
@@ -13,6 +18,12 @@ export const SETTINGS_SECTIONS = [
     label: "Profile",
     description: "What your examiner knows about you.",
     icon: UserRoundIcon,
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    description: "How Ambrace looks on this device.",
+    icon: SunMoonIcon,
   },
   {
     id: "account",

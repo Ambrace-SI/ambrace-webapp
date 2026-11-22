@@ -290,6 +290,75 @@ describe("after a viva that broke", () => {
   });
 });
 
+describe("the room is the home page", () => {
+  /** The engine's state, as the voice engine would set it in the store. */
+  const engineSets = (
+    changes: Partial<ReturnType<typeof useVivaStore.getState>>,
+  ) => act(() => useVivaStore.setState(changes));
+
+  async function inLiveViva() {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+    engineSets({ sessionId: "session-1", sessionState: SessionState.ACTIVE });
+  }
+
+  test("when the engine ends a viva early and heads home, the student is back at the welcome", async () => {
+    // The engine sends the student to "/", which is this page, so nothing
+    // is unmounted: the room has to notice and step back itself.
+    await inLiveViva();
+    engine.resetSession.mockImplementation(() => {
+      calls.push("reset");
+      useVivaStore.getState().resetSession();
+    });
+
+    engineSets({
+      sessionState: SessionState.IDLE,
+      error: "Microphone access is blocked.",
+    });
+
+    expect(await screen.findByText(/setup for/)).toBeTruthy();
+    expect(screen.queryByText(/^live:/)).toBeNull();
+    expect(engine.resetSession).toHaveBeenCalled();
+    // The reason stays for the welcome screen to show.
+    expect(useVivaStore.getState().error).toBe("Microphone access is blocked.");
+    expect(wholeScreen).toHaveBeenLastCalledWith(false);
+    expect(listRefreshed).toHaveBeenCalledWith({ queryKey: ["history"] });
+    engine.resetSession.mockImplementation(() => void calls.push("reset"));
+  });
+
+  test("the quiet moment before the engine starts is not mistaken for heading home", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    // The store is still idle until the engine begins connecting.
+    engineSets({ sessionId: "session-1", sessionState: SessionState.IDLE });
+
+    expect(screen.getByText("live: Science / Cell")).toBeTruthy();
+  });
+
+  test("going back by choice does not carry the reason the student already read", async () => {
+    await inLiveViva();
+    engine.resetSession.mockImplementation(() => {
+      calls.push("reset");
+      useVivaStore.getState().resetSession();
+    });
+    engineSets({
+      sessionState: SessionState.ERROR,
+      error: "The line dropped.",
+    });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "choose again" }));
+
+    expect(screen.getByText(/setup for/)).toBeTruthy();
+    expect(useVivaStore.getState().error).toBeNull();
+    engine.resetSession.mockImplementation(() => void calls.push("reset"));
+  });
+});
+
 describe("leaving the page", () => {
   /** The live session as the voice engine would have left it in the store. */
   const engineState = (

@@ -215,7 +215,7 @@ describe("the frame around every page", () => {
     expect(panel().getAttribute("aria-label")).toBe("Your vivas and account");
     expect(
       screen.getByRole("link", { name: "New viva" }).getAttribute("href"),
-    ).toBe("/viva");
+    ).toBe("/");
     // The logo leads home, in the panel and in the phone's top bar.
     for (const logo of screen.getAllByRole("link", { name: "Ambrace" }))
       expect(logo.getAttribute("href")).toBe("/");
@@ -260,8 +260,8 @@ describe("the frame around every page", () => {
 describe("the page the student is on", () => {
   const newViva = () => screen.getByRole("link", { name: "New viva" });
 
-  test("New viva is marked while a viva is being chosen", () => {
-    address.pathname = "/viva";
+  test("New viva is marked on home, where a viva is chosen", () => {
+    address.pathname = "/";
     renderShell();
 
     expect(newViva().getAttribute("aria-current")).toBe("page");
@@ -269,6 +269,7 @@ describe("the page the student is on", () => {
   });
 
   test("and is not marked anywhere else", () => {
+    address.pathname = "/v";
     renderShell();
 
     expect(newViva().getAttribute("aria-current")).toBeNull();
@@ -909,6 +910,14 @@ describe("the account menu", () => {
       await screen.findByRole("dialog", { name: "Settings" }),
     ).toBeTruthy();
     expect(window.location.hash).toBe("#settings/profile");
+  });
+
+  test("the theme is not in the menu: it lives in Settings, under Appearance", async () => {
+    renderShell();
+    await press("Account menu for Asha Rao");
+
+    expect(screen.queryAllByRole("menuitemradio")).toHaveLength(0);
+    expect(screen.queryByText("Theme")).toBeNull();
   });
 
   test("on a phone, opening Settings puts the drawer away first", async () => {

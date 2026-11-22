@@ -15,6 +15,7 @@ import {
   type SettingsSectionId,
 } from "@/lib/settings/sections";
 import { settingsWindow } from "@/lib/settings/settings-window";
+import { themePreference } from "@/lib/theme/theme-preference";
 import type { Me, ProfileUpdate } from "@/types/profile";
 
 /**
@@ -139,9 +140,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the parts of Settings", () => {
-  test("are Profile and Account, and Settings opens on Profile", () => {
+  test("are Profile, Appearance and Account, and Settings opens on Profile", () => {
     expect(SETTINGS_SECTIONS.map((section) => section.label)).toEqual([
       "Profile",
+      "Appearance",
       "Account",
     ]);
     expect(DEFAULT_SETTINGS_SECTION).toBe("profile");
@@ -285,7 +287,11 @@ describe("the Settings window", () => {
     const tabs = within(
       screen.getByRole("tablist", { name: "Settings" }),
     ).getAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["Profile", "Account"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      "Profile",
+      "Appearance",
+      "Account",
+    ]);
     expect(tabs[0].getAttribute("aria-selected")).toBe("true");
     expect(tabs[1].getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("heading", { level: 3 }).textContent).toBe(
@@ -663,6 +669,58 @@ describe("changing a detail", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(
       /session has ended/,
     );
+  });
+});
+
+describe("Appearance", () => {
+  const choice = (name: string) =>
+    screen.getByRole("radio", {
+      name: new RegExp(`^${name}`),
+    }) as HTMLInputElement;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove("dark");
+    themePreference.reset();
+  });
+
+  test("offers light, dark and the device's own setting, with device chosen to begin with", () => {
+    renderSettings("appearance");
+
+    const group = screen.getByRole("radiogroup", { name: "Theme" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((radio) => radio.getAttribute("value")),
+    ).toEqual(["light", "dark", "system"]);
+    expect(choice("Device").checked).toBe(true);
+  });
+
+  test("choosing dark turns the app dark at once, and is remembered", async () => {
+    renderSettings("appearance");
+
+    await user().click(choice("Dark"));
+
+    expect(choice("Dark").checked).toBe(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(localStorage.getItem("ambrace:theme")).toBe("dark");
+  });
+
+  test("the backdrop behind the window is an Ink scrim with no blur, so it dims a dark page instead of washing it out", () => {
+    renderSettings("appearance");
+
+    const backdrop = document.querySelector('[data-slot="dialog-overlay"]')!;
+    expect(backdrop.className).toContain("bg-scrim");
+    expect(backdrop.className).not.toMatch(/bg-foreground|backdrop-blur/);
+  });
+
+  test("choosing light turns it back", async () => {
+    renderSettings("appearance");
+    await user().click(choice("Dark"));
+
+    await user().click(choice("Light"));
+
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 });
 

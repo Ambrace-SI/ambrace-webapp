@@ -8,6 +8,7 @@ import {
 import "./globals.css";
 
 import { AppProviders } from "@/components/providers/app-providers";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme/boot-script";
 
 // Sora is the logo typeface, so headings sound like the brand.
 const heading = Sora({
@@ -55,7 +56,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${heading.variable} ${body.variable} ${mono.variable} ${devanagari.variable} h-full antialiased`}
+      // The theme script below sets a class and colour-scheme on this element
+      // before React loads, so its attributes differ from the server's on
+      // purpose. This silences that one expected difference, on this element
+      // only; mismatches anywhere inside still warn.
+      suppressHydrationWarning
     >
+      <head>
+        {/* Must run before anything is drawn, so a dark choice never flashes
+            light. Built from the shared theme rules (lib/theme). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         <AppProviders>{children}</AppProviders>
       </body>

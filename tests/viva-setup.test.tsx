@@ -1,27 +1,18 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { VivaSetup, type VivaChoice } from "@/components/viva/viva-setup";
 import { curriculum } from "@/lib/curriculum/selectors";
+import { useVivaStore } from "@/lib/store/viva-store";
 import type { Profile } from "@/types/profile";
-
-vi.mock("next/link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
-}));
 
 const PROFILE: Profile = {
   name: "Asha Rao",
   class_level: 9,
-  board: null,
-  school_name: null,
+  board: "STATE_BOARD",
+  school_name: "Hill View School",
   school_address: null,
   created_at: "2026-11-21T10:00:00Z",
   updated_at: "2026-11-21T10:00:00Z",
@@ -29,12 +20,28 @@ const PROFILE: Profile = {
 
 const onStart = vi.fn<(choice: VivaChoice) => void>();
 
+/** Whether the screen is phone-sized, as the browser would answer it. */
+function screenIs(kind: "laptop" | "phone") {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: kind === "phone" && query.includes("max-width"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+}
+
 function renderSetup(
-  props: Partial<{ starting: boolean; error: string | null }> = {},
+  props: Partial<{
+    profile: Profile;
+    starting: boolean;
+    error: string | null;
+  }> = {},
 ) {
   return render(
     <VivaSetup
-      profile={PROFILE}
+      profile={props.profile ?? PROFILE}
       starting={props.starting ?? false}
       error={props.error ?? null}
       onStart={onStart}
@@ -42,65 +49,209 @@ function renderSetup(
   );
 }
 
+const user = () => userEvent.setup();
+
+/** The choices along the bottom of the screen. */
+const choice = (name: RegExp) =>
+  screen.getByRole("button", { name }) as HTMLButtonElement;
+const subjectChoice = () => choice(/^Subject/);
+const chapterChoice = () => choice(/^Chapter/);
+const topicsChoice = () => choice(/^Topics/);
+const voiceChoice = () => choice(/^Voice/);
+const startButton = () =>
+  screen.getByRole("button", {
+    name: /^(Start viva|Starting)$/,
+  }) as HTMLButtonElement;
+
 /** The real Class 9 catalogue, so the test breaks if its shape ever does. */
 async function subjectsLoaded() {
-  return screen.findByRole("radio", { name: "Science" });
+  await waitFor(() => expect(subjectChoice().disabled).toBe(false));
 }
 
-async function chooseCellChapter(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await subjectsLoaded());
-  await user.click(
+async function chooseSubject(
+  actor: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  if (!screen.queryByRole("group", { name: "Subject" }))
+    await actor.click(subjectChoice());
+  await actor.click(screen.getByRole("radio", { name }));
+}
+
+async function chooseCellChapter(actor: ReturnType<typeof userEvent.setup>) {
+  await subjectsLoaded();
+  await chooseSubject(actor, "Science");
+  // Choosing a subject leads straight on to its chapters.
+  await actor.click(
     screen.getByRole("radio", { name: /Cell: The Building Block of Life/ }),
   );
 }
 
-const startButton = () =>
-  screen.getByRole("button", { name: "Start viva" }) as HTMLButtonElement;
+beforeEach(() => {
+  onStart.mockReset();
+  screenIs("laptop");
+  // Radix measures the trigger it opens beside; jsdom has nothing to measure.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  useVivaStore.getState().resetSession();
+});
+afterEach(() => vi.unstubAllGlobals());
 
-beforeEach(() => onStart.mockReset());
+describe("the welcome", () => {
+  test("greets the student by first name and shows what we know", async () => {
+    renderSetup();
+
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Hello, Asha.",
+    );
+    expect(
+      screen.getByText("Class 9 · State board · Hill View School"),
+    ).toBeTruthy();
+    expect(screen.getByText("How are you doing today?")).toBeTruthy();
+    await subjectsLoaded();
+  });
+
+  test("leaves out details the student skipped, with no stray separators", async () => {
+    renderSetup({ profile: { ...PROFILE, board: null, school_name: null } });
+
+    expect(screen.getByText("Class 9")).toBeTruthy();
+    await subjectsLoaded();
+  });
+
+  test("the line under the greeting follows what has been chosen", async () => {
+    const actor = user();
+    renderSetup();
+    await subjectsLoaded();
+
+    await chooseSubject(actor, "Science");
+    expect(
+      screen.getByText("Science it is. Which chapter shall we talk through?"),
+    ).toBeTruthy();
+
+    await actor.click(
+      screen.getByRole("radio", { name: /Cell: The Building Block of Life/ }),
+    );
+    expect(
+      screen.getByText("Cell: The Building Block of Life. Ready when you are."),
+    ).toBeTruthy();
+  });
+
+  test("a viva that broke explains itself here, until dismissed", async () => {
+    // The voice engine brings the student back here when a viva cannot go on.
+    useVivaStore.getState().setError("Microphone access was blocked.");
+    renderSetup();
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Your viva stopped. Microphone access was blocked.",
+    );
+
+    await user().click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(useVivaStore.getState().error).toBeNull();
+  });
+
+  test("it carries no way to another page: the side panel is that", async () => {
+    renderSetup();
+    await subjectsLoaded();
+
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});
 
 describe("what the student is and is not asked", () => {
   test("name and class come from the profile; neither is a question", async () => {
     renderSetup();
     await subjectsLoaded();
 
-    expect(screen.getByText("Class 9 · Asha")).toBeTruthy();
     expect(screen.queryByLabelText(/name/i)).toBeNull();
-    expect(screen.queryByRole("radio", { name: /Class/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Class/ })).toBeNull();
   });
 
-  test("one question at a time: chapters wait for a subject, focus waits for a chapter", async () => {
-    const user = userEvent.setup();
+  test("one choice at a time: chapter waits for a subject, topics for a chapter", async () => {
+    const actor = user();
     renderSetup();
     await subjectsLoaded();
 
-    expect(screen.queryByRole("group", { name: "Chapter" })).toBeNull();
+    expect(chapterChoice().disabled).toBe(true);
+    expect(topicsChoice().disabled).toBe(true);
     expect(screen.getByRole("status").textContent).toBe(
       "Choose a subject to begin.",
     );
 
-    await user.click(screen.getByRole("radio", { name: "Science" }));
+    await chooseSubject(actor, "Science");
 
-    expect(screen.getByRole("group", { name: "Chapter" })).toBeTruthy();
-    expect(screen.queryByRole("group", { name: /Focus/ })).toBeNull();
+    expect(chapterChoice().disabled).toBe(false);
+    expect(topicsChoice().disabled).toBe(true);
     expect(screen.getByRole("status").textContent).toBe(
       "Now choose a chapter.",
     );
 
-    await user.click(
+    await actor.click(
       screen.getByRole("radio", { name: /Cell: The Building Block of Life/ }),
     );
 
-    expect(screen.getByRole("group", { name: /Focus/ })).toBeTruthy();
-    expect(
-      screen.getByRole("group", { name: /Examiner's voice/ }),
-    ).toBeTruthy();
+    expect(topicsChoice().disabled).toBe(false);
     expect(screen.getByRole("status").textContent).toMatch(/microphone/);
+  });
+
+  test("each choice shows what was picked", async () => {
+    const actor = user();
+    renderSetup();
+    await chooseCellChapter(actor);
+
+    expect(subjectChoice().textContent).toMatch(/Science/);
+    expect(chapterChoice().textContent).toMatch(
+      /Cell: The Building Block of Life/,
+    );
+    expect(topicsChoice().textContent).toMatch(/Whole chapter/);
+    expect(voiceChoice().textContent).toMatch(/Kore/);
+  });
+
+  test("the lists open above the bar and close once something is picked", async () => {
+    const actor = user();
+    renderSetup();
+    await subjectsLoaded();
+
+    await actor.click(subjectChoice());
+    expect(subjectChoice().getAttribute("aria-expanded")).toBe("true");
+
+    await actor.click(screen.getByRole("radio", { name: "Science" }));
+    expect(screen.queryByRole("group", { name: "Subject" })).toBeNull();
+    expect(screen.getByRole("group", { name: "Chapter" })).toBeTruthy();
+
+    await actor.click(
+      screen.getByRole("radio", { name: /Cell: The Building Block of Life/ }),
+    );
+    expect(screen.queryByRole("group", { name: "Chapter" })).toBeNull();
+  });
+
+  test("a long chapter list can be searched", async () => {
+    const actor = user();
+    renderSetup();
+    await subjectsLoaded();
+    await chooseSubject(actor, "Science");
+
+    await actor.type(screen.getByLabelText("Find a chapter"), "cell");
+
+    const chapters = within(screen.getByRole("group", { name: "Chapter" }));
+    expect(chapters.getAllByRole("radio")).toHaveLength(1);
+
+    await actor.clear(screen.getByLabelText("Find a chapter"));
+    await actor.type(screen.getByLabelText("Find a chapter"), "zzz");
+    expect(chapters.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.getByText("No chapter matches that.")).toBeTruthy();
   });
 
   test("a subject with nothing to examine is not offered", async () => {
     renderSetup();
     await subjectsLoaded();
+    await user().click(subjectChoice());
 
     // Class 9 lists "Interdisciplinary Area" with no chapters.
     expect(
@@ -109,41 +260,48 @@ describe("what the student is and is not asked", () => {
   });
 
   test("changing subject drops the chapter chosen under the old one", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
+    await chooseCellChapter(actor);
 
-    await user.click(screen.getByRole("radio", { name: "Mathematics" }));
+    await chooseSubject(actor, "Mathematics");
 
-    expect(screen.queryByRole("group", { name: /Focus/ })).toBeNull();
+    expect(chapterChoice().textContent).toMatch(/Choose a chapter/);
+    expect(topicsChoice().disabled).toBe(true);
     expect(startButton().disabled).toBe(true);
+  });
+
+  test("on a phone the lists open as a sheet from the bottom", async () => {
+    screenIs("phone");
+    const actor = user();
+    renderSetup();
+    await subjectsLoaded();
+
+    await actor.click(subjectChoice());
+
+    const sheet = screen.getByRole("dialog", { name: "Subject" });
+    await actor.click(within(sheet).getByRole("radio", { name: "Science" }));
+    expect(screen.getByRole("dialog", { name: "Chapter" })).toBeTruthy();
   });
 });
 
 describe("starting", () => {
   test("cannot start until a chapter is chosen", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
     await subjectsLoaded();
 
     expect(startButton().disabled).toBe(true);
-    await user.click(screen.getByRole("radio", { name: "Science" }));
+    await chooseSubject(actor, "Science");
     expect(startButton().disabled).toBe(true);
   });
 
   test("with nothing narrowed, the whole chapter is examined in the default voice", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
+    await chooseCellChapter(actor);
 
-    expect(
-      (
-        screen.getByRole("checkbox", {
-          name: "Whole chapter",
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
-    await user.click(startButton());
+    await actor.click(startButton());
 
     expect(onStart).toHaveBeenCalledTimes(1);
     const { selection, voiceName } = onStart.mock.calls[0][0];
@@ -163,13 +321,20 @@ describe("starting", () => {
   });
 
   test("chosen topics and voice are what is sent", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
+    await chooseCellChapter(actor);
 
-    await user.click(screen.getByRole("checkbox", { name: "Nucleus" }));
-    await user.click(screen.getByRole("radio", { name: "Puck" }));
-    await user.click(startButton());
+    await actor.click(topicsChoice());
+    await actor.click(screen.getByRole("checkbox", { name: "Nucleus" }));
+    await actor.click(screen.getByRole("button", { name: "Done" }));
+    expect(topicsChoice().textContent).toMatch(/1 topic/);
+
+    await actor.click(voiceChoice());
+    await actor.click(screen.getByRole("radio", { name: "Puck" }));
+    expect(voiceChoice().textContent).toMatch(/Puck/);
+
+    await actor.click(startButton());
 
     const { selection, voiceName } = onStart.mock.calls[0][0];
     expect(voiceName).toBe("Puck");
@@ -179,9 +344,9 @@ describe("starting", () => {
   });
 
   test("while starting, nothing can be changed or sent twice", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     const view = renderSetup();
-    await chooseCellChapter(user);
+    await chooseCellChapter(actor);
 
     view.rerender(
       <VivaSetup profile={PROFILE} starting error={null} onStart={onStart} />,
@@ -190,13 +355,16 @@ describe("starting", () => {
     const button = screen.getByRole("button", { name: "Starting" });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(button.getAttribute("aria-busy")).toBe("true");
-    expect(
-      (screen.getByRole("radio", { name: "Science" }) as HTMLInputElement)
-        .disabled,
-    ).toBe(true);
+    for (const each of [
+      subjectChoice,
+      chapterChoice,
+      topicsChoice,
+      voiceChoice,
+    ])
+      expect(each().disabled).toBe(true);
   });
 
-  test("a failed start is explained next to the button", async () => {
+  test("a failed start is explained above the bar", async () => {
     renderSetup({ error: "We couldn't start your viva." });
     await subjectsLoaded();
 
@@ -204,131 +372,136 @@ describe("starting", () => {
       "We couldn't start your viva.",
     );
   });
-
-  test("it carries no way home of its own: the side panel around it is that", async () => {
-    renderSetup();
-
-    expect(screen.queryByRole("link")).toBeNull();
-  });
 });
 
-describe("narrowing the focus", () => {
-  const focus = () => within(screen.getByRole("group", { name: /Focus/ }));
+describe("narrowing to topics", () => {
+  const topics = () => within(screen.getByRole("group", { name: "Topics" }));
+
+  async function openTopics(actor: ReturnType<typeof userEvent.setup>) {
+    await chooseCellChapter(actor);
+    await actor.click(topicsChoice());
+  }
 
   test("picking a topic turns off whole chapter; picking whole chapter clears topics", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
+    await openTopics(actor);
     const whole = () =>
-      focus().getByRole("checkbox", {
+      topics().getByRole("checkbox", {
         name: "Whole chapter",
       }) as HTMLInputElement;
     const nucleus = () =>
-      focus().getByRole("checkbox", { name: "Nucleus" }) as HTMLInputElement;
+      topics().getByRole("checkbox", { name: "Nucleus" }) as HTMLInputElement;
 
-    await user.click(nucleus());
+    expect(whole().checked).toBe(true);
+    await actor.click(nucleus());
     expect(whole().checked).toBe(false);
     expect(nucleus().checked).toBe(true);
 
-    await user.click(whole());
+    await actor.click(whole());
     expect(whole().checked).toBe(true);
     expect(nucleus().checked).toBe(false);
   });
 
   test("a topic of the student's own is added, sent, and can be removed", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
-    const input = focus().getByLabelText("Add a topic of your own");
+    await openTopics(actor);
+    const input = topics().getByLabelText("Add a topic of your own");
 
-    await user.type(input, "  Osmosis in potato strips ");
-    await user.click(focus().getByRole("button", { name: "Add" }));
+    await actor.type(input, "  Osmosis in potato strips ");
+    await actor.click(topics().getByRole("button", { name: "Add" }));
 
     expect((input as HTMLInputElement).value).toBe("");
-    const added = focus().getByRole("checkbox", {
+    const added = topics().getByRole("checkbox", {
       name: "Osmosis in potato strips",
     }) as HTMLInputElement;
     expect(added.checked).toBe(true);
 
-    await user.click(startButton());
-    expect(onStart.mock.calls[0][0].selection.chapters[0].topics).toEqual([
-      { id: "custom-topic-1", name: "Osmosis in potato strips" },
-    ]);
-
-    await user.click(added);
+    await actor.click(added);
     expect(
-      focus().queryByRole("checkbox", { name: "Osmosis in potato strips" }),
+      topics().queryByRole("checkbox", { name: "Osmosis in potato strips" }),
     ).toBeNull();
-  });
+
+    await actor.type(input, "Turgor");
+    await actor.click(topics().getByRole("button", { name: "Add" }));
+    await actor.click(screen.getByRole("button", { name: "Done" }));
+    await actor.click(startButton());
+    expect(onStart.mock.calls[0][0].selection.chapters[0].topics).toEqual([
+      { id: "custom-topic-1", name: "Turgor" },
+    ]);
+    // Two topics typed key by key, plus a dozen clicks: with every file
+    // running at once it can pass the default limit, so it has its own.
+  }, 15_000);
 
   test("Enter in the topic box adds the topic and does not start the viva", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
+    await openTopics(actor);
 
-    await user.type(
-      focus().getByLabelText("Add a topic of your own"),
+    await actor.type(
+      topics().getByLabelText("Add a topic of your own"),
       "Diffusion{Enter}",
     );
 
-    expect(focus().getByRole("checkbox", { name: "Diffusion" })).toBeTruthy();
+    expect(topics().getByRole("checkbox", { name: "Diffusion" })).toBeTruthy();
     expect(onStart).not.toHaveBeenCalled();
   });
 
   test("an empty box adds nothing", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
-    const before = focus().getAllByRole("checkbox").length;
+    await openTopics(actor);
+    const before = topics().getAllByRole("checkbox").length;
 
-    await user.type(
-      focus().getByLabelText("Add a topic of your own"),
+    await actor.type(
+      topics().getByLabelText("Add a topic of your own"),
       "{Enter}",
     );
 
     expect(
-      (focus().getByRole("button", { name: "Add" }) as HTMLButtonElement)
+      (topics().getByRole("button", { name: "Add" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-    expect(focus().getAllByRole("checkbox")).toHaveLength(before);
+    expect(topics().getAllByRole("checkbox")).toHaveLength(before);
   });
 
   test("a topic that is too long is refused with a reason, and typing clears it", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     renderSetup();
-    await chooseCellChapter(user);
-    const input = focus().getByLabelText("Add a topic of your own");
+    await openTopics(actor);
+    const input = topics().getByLabelText("Add a topic of your own");
 
-    await user.click(input);
-    await user.paste("x".repeat(101));
-    await user.click(focus().getByRole("button", { name: "Add" }));
+    await actor.click(input);
+    await actor.paste("x".repeat(101));
+    await actor.click(topics().getByRole("button", { name: "Add" }));
 
-    expect(focus().getByRole("alert").textContent).toMatch(/100 characters/);
+    expect(topics().getByRole("alert").textContent).toMatch(/100 characters/);
     expect(input.getAttribute("aria-invalid")).toBe("true");
 
-    await user.type(input, "{Backspace}");
-    expect(focus().queryByRole("alert")).toBeNull();
+    await actor.type(input, "{Backspace}");
+    expect(topics().queryByRole("alert")).toBeNull();
   });
 
   test("no more than twenty topics of the student's own", async () => {
     // Sixty-odd presses, so no pause between each.
-    const user = userEvent.setup({ delay: null });
+    const actor = userEvent.setup({ delay: null });
     renderSetup();
-    await chooseCellChapter(user);
-    const input = focus().getByLabelText("Add a topic of your own");
+    await openTopics(actor);
+    const input = topics().getByLabelText("Add a topic of your own");
 
     for (let count = 1; count <= 20; count++) {
-      await user.click(input);
-      await user.paste(`Own topic ${count}`);
-      await user.keyboard("{Enter}");
+      await actor.click(input);
+      await actor.paste(`Own topic ${count}`);
+      await actor.keyboard("{Enter}");
     }
-    await user.click(input);
-    await user.paste("One too many");
-    await user.keyboard("{Enter}");
+    await actor.click(input);
+    await actor.paste("One too many");
+    await actor.keyboard("{Enter}");
 
-    expect(focus().getByRole("alert").textContent).toMatch(/up to 20/);
+    expect(topics().getByRole("alert").textContent).toMatch(/up to 20/);
     expect(
-      focus().queryByRole("checkbox", { name: "One too many" }),
+      topics().queryByRole("checkbox", { name: "One too many" }),
     ).toBeNull();
     // The longest test in the suite by far. With every file running at once
     // it takes about as long as the default limit, so it has its own.
@@ -337,19 +510,12 @@ describe("narrowing the focus", () => {
 
 describe("when the subject list will not load", () => {
   test("says so, and trying again recovers", async () => {
-    const user = userEvent.setup();
+    const actor = user();
     // Class 12 has not been loaded by any other test in this file.
     const load = vi
       .spyOn(curriculum, "loadClass")
       .mockRejectedValueOnce(new Error("offline"));
-    render(
-      <VivaSetup
-        profile={{ ...PROFILE, class_level: 12 }}
-        starting={false}
-        error={null}
-        onStart={onStart}
-      />,
-    );
+    renderSetup({ profile: { ...PROFILE, class_level: 12 } });
 
     expect(screen.getByRole("status").textContent).toBe(
       "Getting your subjects ready.",
@@ -358,29 +524,21 @@ describe("when the subject list will not load", () => {
       /couldn't load your subjects/,
     );
 
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await actor.click(screen.getByRole("button", { name: "Try again" }));
 
-    await waitFor(() =>
-      expect(screen.getAllByRole("radio").length).toBeGreaterThan(0),
-    );
+    await waitFor(() => expect(subjectChoice().disabled).toBe(false));
     expect(load).toHaveBeenCalledTimes(2);
   });
 
-  test("a class with no subjects says so instead of showing an empty form", async () => {
+  test("a class with no subjects says so instead of offering an empty list", async () => {
     vi.spyOn(curriculum, "loadClass").mockResolvedValue(undefined);
     vi.spyOn(curriculum, "getSubjectCatalog").mockReturnValue([]);
 
-    render(
-      <VivaSetup
-        profile={{ ...PROFILE, class_level: 11 }}
-        starting={false}
-        error={null}
-        onStart={onStart}
-      />,
-    );
+    renderSetup({ profile: { ...PROFILE, class_level: 11 } });
 
     expect(
       await screen.findByText("There are no subjects for Class 11 yet."),
     ).toBeTruthy();
+    expect(subjectChoice().disabled).toBe(true);
   });
 });

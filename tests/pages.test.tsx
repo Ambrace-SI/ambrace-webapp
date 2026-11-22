@@ -31,7 +31,6 @@ vi.mock("@/components/auth/signed-out-only", () => ({
 vi.mock("@/components/onboarding/onboarding-flow", () => ({
   OnboardingFlow: () => <p>onboarding</p>,
 }));
-vi.mock("@/components/app/home", () => ({ Home: () => <p>home</p> }));
 vi.mock("@/components/viva/viva-room", () => ({
   VivaRoom: () => <p>viva room</p>,
 }));
@@ -52,6 +51,11 @@ vi.mock("@/components/app/session-gate", () => ({
     needs: string;
     children: ReactNode;
   }) => <div data-needs={needs}>{children}</div>,
+}));
+
+const forwardedTo: string[] = [];
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: (path: string) => forwardedTo.push(path) }),
 }));
 
 afterEach(cleanup);
@@ -102,13 +106,13 @@ describe("signed-in addresses", () => {
     expect(gate?.querySelector("[data-frame=app]")?.textContent).toBe("a page");
   });
 
-  test("home is at the root", async () => {
+  test("home is the viva room: the welcome, the choices and the viva itself", async () => {
     const page = await import("@/app/(app)/page");
 
     render(<page.default />);
 
     expect(page.metadata.title).toBe("Home");
-    expect(screen.getByText("home")).toBeTruthy();
+    expect(screen.getByText("viva room")).toBeTruthy();
   });
 
   test("a report sits inside the app", async () => {
@@ -120,13 +124,13 @@ describe("signed-in addresses", () => {
     expect(screen.getByText("report")).toBeTruthy();
   });
 
-  test("the viva sits inside the app too, so the side panel stays", async () => {
+  test("the old viva address still works: it forwards to home", async () => {
     const page = await import("@/app/(app)/viva/page");
 
     render(<page.default />);
 
     expect(page.metadata.title).toBe("Viva");
-    expect(screen.getByText("viva room")).toBeTruthy();
+    expect(forwardedTo).toEqual(["/"]);
   });
 
   test("onboarding only needs a session, or it would redirect to itself", async () => {

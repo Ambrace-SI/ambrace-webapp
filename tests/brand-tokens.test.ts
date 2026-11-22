@@ -58,6 +58,35 @@ for (const [name, theme] of Object.entries(themes)) {
     assert.ok(contrast(theme["ember-foreground"], theme.ember) >= AA_TEXT);
   });
 
+  test(`${name}: the selector's surfaces use only the agreed palette`, () => {
+    const palette = new Set([
+      "#0b0b10", // Ink
+      "#1c1b25", // Graphite
+      "#ecebf2", // Mist
+      "#f4f3ef", // Paper
+      "#cfcdd8", // Orbit light
+      "#3a3946", // Orbit dark
+    ]);
+    for (const token of ["surface", "surface-active"])
+      assert.ok(palette.has(theme[token]), `${token} is ${theme[token]}`);
+  });
+
+  test(`${name}: text stays readable on the selector's surfaces`, () => {
+    for (const surface of ["surface", "surface-active"]) {
+      assert.ok(contrast(theme.foreground, theme[surface]) >= AAA_TEXT);
+      assert.ok(
+        contrast(theme["muted-foreground"], theme[surface]) >= AA_TEXT,
+        `muted text on ${surface}`,
+      );
+    }
+  });
+
+  test(`${name}: the logo's inner orbit, drawn in the muted tone, is visible`, () => {
+    // Graphics need 3:1. The logo kit's own orbit tint is about 1.5:1.
+    for (const surface of ["background", "surface"])
+      assert.ok(contrast(theme["muted-foreground"], theme[surface]) >= 3);
+  });
+
   test(`${name}: coral text is readable where it is used`, () => {
     assert.ok(contrast(theme["ember-text"], theme.background) >= AA_TEXT);
   });
@@ -82,6 +111,49 @@ test("Ember is not the general primary colour", () => {
     assert.notEqual(theme.primary, theme.ember);
     assert.notEqual(theme.ring, theme.ember);
   }
+});
+
+test("the logo files the app shows draw the inner orbit in the muted tones", () => {
+  const orbit = (file: string) =>
+    readFileSync(`public/brand/${file}`, "utf8").match(
+      /<circle cx="60" cy="60" r="20"[^>]*stroke="(#[0-9A-Fa-f]{6})"/,
+    )?.[1];
+
+  assert.equal(orbit("ambrace-lowercase-horizontal.svg"), "#55536A");
+  assert.equal(orbit("ambrace-lowercase-horizontal-reversed.svg"), "#9A98AC");
+});
+
+test("the scrim behind windows is Ink in both themes, stronger on Ink", () => {
+  const scrim = (selector: string) =>
+    css
+      .slice(css.indexOf(`${selector} {`))
+      .match(/--scrim:\s*rgb\(11 11 16 \/ (0\.\d+)\)/)?.[1];
+
+  const paper = Number(scrim(":root"));
+  const ink = Number(scrim(".dark"));
+  assert.ok(paper > 0 && ink > paper, `scrim ${paper} on Paper, ${ink} on Ink`);
+});
+
+test("scrollbars everywhere are thin, quiet and in the theme's own tone", () => {
+  // Orbit light on Paper, Orbit dark on Ink: the same tone as the borders.
+  assert.equal(themes.Paper.scrollbar, "#cfcdd8");
+  assert.equal(themes.Ink.scrollbar, "#3a3946");
+  // The side panel's look, for every scrolling area: the standard thin bar.
+  const everywhere = css.slice(0, css.indexOf("@supports not"));
+  assert.match(everywhere, /scrollbar-width:\s*thin/);
+  assert.match(
+    everywhere,
+    /scrollbar-color:\s*var\(--scrollbar\)\s+transparent/,
+  );
+  // Browsers that cannot read those (older Safari) get the same look the
+  // old way, and only they do.
+  const fallback = css.slice(css.indexOf("@supports not (scrollbar-color"));
+  assert.match(fallback, /::-webkit-scrollbar-thumb/);
+});
+
+test("the side panel uses the shared scrollbar, not one of its own", () => {
+  const sidebar = readFileSync("components/ui/sidebar.tsx", "utf8");
+  assert.doesNotMatch(sidebar, /scrollbar-color|scrollbar-width/);
 });
 
 test("the stylesheet has no gradients or glows", () => {

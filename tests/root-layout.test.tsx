@@ -33,6 +33,12 @@ describe("the page that wraps every screen", () => {
     }
   });
 
+  test("sets the theme before anything is drawn, so a dark choice never flashes light", () => {
+    expect(html).toMatch(
+      /<head><script>[\s\S]*"ambrace:theme"[\s\S]*<\/script><\/head>/,
+    );
+  });
+
   test("gives every screen access to sign-in and data loading", () => {
     expect(html).toContain('<div data-providers=""><p>a screen</p></div>');
   });

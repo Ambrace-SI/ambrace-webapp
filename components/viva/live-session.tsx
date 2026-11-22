@@ -9,7 +9,7 @@ import { LiveCaptions } from "@/components/viva/live-captions";
 import { SessionClock } from "@/components/viva/session-clock";
 import { VoiceOrb } from "@/components/viva/voice-orb";
 import { Button } from "@/components/ui/button";
-import { HOME_PATH, reportPath } from "@/lib/auth/routes";
+import { reportPath } from "@/lib/auth/routes";
 import { HISTORY_KEY } from "@/lib/hooks/use-history";
 import { useMicrophoneUnheard } from "@/lib/hooks/use-microphone-unheard";
 import type { useVivaSession } from "@/lib/hooks/useVivaSession";
@@ -22,8 +22,9 @@ export type VivaScope = { subject: string; chapter: string };
 /**
  * The viva itself.
  *
- * The screen is Ink and almost empty on purpose: this is a conversation, and
- * the student should be listening and speaking, not reading. The side panel
+ * The screen is almost empty on purpose: this is a conversation, and the
+ * student should be listening and speaking, not reading. It follows the
+ * student's theme like every other screen, so a light choice stays light. The side panel
  * is put away, so there is no way to wander off by accident. Two controls
  * only: mute, and finish. Everything else on screen answers one question:
  * whose turn is it?
@@ -71,7 +72,7 @@ export function LiveSession({
   }
 
   return (
-    <div className="dark flex h-dvh flex-col bg-background text-foreground">
+    <div className="flex h-dvh flex-col bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-2xl items-center justify-between gap-4 px-6 pt-5 sm:px-10">
         <p className="label-mono min-w-0 truncate text-muted-foreground">
           {scope.subject} · {scope.chapter}
@@ -86,6 +87,7 @@ export function LiveSession({
             total={conclusionData?.total ?? 10}
             summary={conclusionData?.feedback}
             sessionId={sessionId}
+            onBackHome={onChooseAgain}
           />
         ) : moment === "error" ? (
           <Stopped message={session.error} onChooseAgain={onChooseAgain} />
@@ -182,17 +184,22 @@ export function LiveSession({
   );
 }
 
-/** The ending stays on the same calm screen: the score, then the way on. */
+/**
+ * The ending stays on the same calm screen: the score, then the way on. Home
+ * is this same page, so going back is a step rather than a link.
+ */
 function Finished({
   score,
   total,
   summary,
   sessionId,
+  onBackHome,
 }: {
   score: number | undefined;
   total: number;
   summary: string | undefined;
   sessionId: string | null;
+  onBackHome: () => void;
 }) {
   return (
     <section className="animate-rise flex flex-1 flex-col justify-center gap-8">
@@ -221,15 +228,18 @@ function Finished({
             </Link>
           </Button>
         ) : null}
-        <Button asChild variant="ghost" size="touch">
-          <Link href={HOME_PATH}>Back to home</Link>
+        <Button type="button" variant="ghost" size="touch" onClick={onBackHome}>
+          Back to home
         </Button>
       </div>
     </section>
   );
 }
 
-/** Something broke. Say what, and offer the way back in. */
+/**
+ * Something broke. Say what, and offer the way back in. Starting again and
+ * going home are the same place now, so there is one way on.
+ */
 function Stopped({
   message,
   onChooseAgain,
@@ -255,9 +265,6 @@ function Stopped({
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button type="button" size="touch" onClick={onChooseAgain}>
           Start again
-        </Button>
-        <Button asChild variant="ghost" size="touch">
-          <Link href={HOME_PATH}>Back to home</Link>
         </Button>
       </div>
     </section>

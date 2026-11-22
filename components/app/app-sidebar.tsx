@@ -22,7 +22,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { HOME_PATH, VIVA_PATH } from "@/lib/auth/routes";
+import { HOME_PATH } from "@/lib/auth/routes";
 
 /**
  * The side panel: start a viva, find an old one, open a report, sign out.
@@ -62,7 +62,7 @@ export function AppSidebar() {
               onClick={closeDrawer}
               className="rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <Logo surface="paper" className="w-[120px]" priority />
+              <Logo surface="theme" className="w-[120px]" priority />
             </Link>
           )}
           <SidebarTrigger />
@@ -138,7 +138,7 @@ function NewVivaRow({
       className="font-medium"
     >
       <Link
-        href={VIVA_PATH}
+        href={HOME_PATH}
         aria-current={current ? "page" : undefined}
         onClick={onNavigate}
       >
@@ -149,8 +149,8 @@ function NewVivaRow({
   );
 }
 
-/** The same row, marked when the student is already choosing a viva. */
+/** The same row, marked on home, where a viva is chosen. */
 function NewVivaRowForThisPage({ onNavigate }: { onNavigate: () => void }) {
-  const current = usePathname() === VIVA_PATH;
+  const current = usePathname() === HOME_PATH;
   return <NewVivaRow current={current} onNavigate={onNavigate} />;
 }

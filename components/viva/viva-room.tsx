@@ -1,7 +1,13 @@
 "use client";
 
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { LiveSession, type VivaScope } from "@/components/viva/live-session";
 import { VivaSetup, type VivaChoice } from "@/components/viva/viva-setup";
@@ -41,7 +47,8 @@ function releaseViva(queryClient: QueryClient, sessionId: string) {
 }
 
 /**
- * One address, two moments: choosing what to talk about, then talking.
+ * Home: one address, two moments. The welcome, where the student chooses what
+ * to talk about, then the viva itself.
  *
  * They share a page because the live session owns the microphone, the speaker
  * and the connection, and all three must be released the moment the student
@@ -49,6 +56,10 @@ function releaseViva(queryClient: QueryClient, sessionId: string) {
  *
  * Choosing happens beside the side panel, like any other page. Talking takes
  * the whole screen, so nothing on it can end the viva by accident.
+ *
+ * Because this page is home, "back to home" never leaves it: the room steps
+ * back to the welcome itself, including when the voice engine ends a viva
+ * early and heads for home on its own.
  */
 export function VivaRoom() {
   const { data: me } = useMe();
@@ -60,8 +71,44 @@ export function VivaRoom() {
 
   // Counts departures, so work begun on one visit cannot finish on the next.
   const visit = useRef(0);
+  // Whether the engine has begun the viva on screen. Until it has, an idle
+  // engine is just one that has not started yet.
+  const engineBegan = useRef(false);
 
   useWholeScreen(scope !== null);
+
+  /**
+   * Back to the welcome on this same page. `keepReason` carries the engine's
+   * last error there; a reason the student already read on screen is not
+   * shown twice.
+   */
+  function backToWelcome({ keepReason }: { keepReason: boolean }) {
+    engineBegan.current = false;
+    const { error } = useVivaStore.getState();
+    session.resetSession();
+    if (keepReason && error) useVivaStore.getState().setError(error);
+    setScope(null);
+    // The viva that stopped is in the list, and the list is back.
+    refreshHistory(queryClient);
+  }
+
+  const engineHeadedHome = useEffectEvent(() =>
+    backToWelcome({ keepReason: true }),
+  );
+
+  // When the engine ends a viva early it goes idle and sends the student to
+  // "/". That is this page, so nothing unmounts: notice it here instead.
+  useEffect(() => {
+    if (!scope) return;
+    engineBegan.current = false;
+    return useVivaStore.subscribe(({ sessionState }) => {
+      if (sessionState !== SessionState.IDLE) {
+        engineBegan.current = true;
+      } else if (engineBegan.current) {
+        engineHeadedHome();
+      }
+    });
+  }, [scope]);
 
   // Leaving ends the visit, however the student leaves. Next keeps this page
   // alive (hidden) after navigation and hands it back as it was, so without
@@ -125,12 +172,7 @@ export function VivaRoom() {
       <LiveSession
         session={session}
         scope={scope}
-        onChooseAgain={() => {
-          session.resetSession();
-          setScope(null);
-          // The viva that stopped is in the list, and the list is back.
-          refreshHistory(queryClient);
-        }}
+        onChooseAgain={() => backToWelcome({ keepReason: false })}
       />
     );
   }
@@ -145,20 +187,26 @@ export function VivaRoom() {
   );
 }
 
+/**
+ * The shape of the welcome while the profile loads: the same blocks in the
+ * same places, so nothing jumps when the real content arrives.
+ */
 function RoomOutline() {
   return (
-    <main
-      className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 pt-10 pb-12 sm:px-10 sm:pt-14"
-      aria-busy="true"
-    >
+    <div className="flex min-h-0 flex-1 flex-col" aria-busy="true">
       <p className="sr-only" role="status">
         Getting ready
       </p>
-      <div className="flex flex-col gap-3">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-10 w-72 max-w-full animate-pulse rounded bg-muted" />
+      <main className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-10">
+        <div className="aspect-square w-48 animate-pulse rounded-full bg-muted sm:w-60" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="h-12 w-72 max-w-full animate-pulse rounded bg-muted sm:h-15" />
+        </div>
+      </main>
+      <div className="mx-auto w-full max-w-4xl px-3 pb-4 sm:px-6 sm:pb-6">
+        <div className="h-72 animate-pulse rounded-[20px] border border-border bg-surface md:h-[4.375rem]" />
       </div>
-      <div className="h-32 animate-pulse rounded-xl border border-border bg-card" />
-    </main>
+    </div>
   );
 }

@@ -121,10 +121,11 @@ describe("during the conversation", () => {
     ).toBe("listening");
   });
 
-  test("it is the dark surface, with no header to wander off through", () => {
+  test("it follows the student's theme, with no header to wander off through", () => {
     const { container } = renderLive();
 
-    expect(container.firstElementChild?.classList.contains("dark")).toBe(true);
+    // Not forced to Ink: a student who chose light gets a light viva.
+    expect(container.firstElementChild?.classList.contains("dark")).toBe(false);
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
   });
@@ -282,9 +283,12 @@ describe("before and after the conversation", () => {
         .getByRole("link", { name: "See the full report" })
         .getAttribute("href"),
     ).toBe("/v?id=session-1");
-    expect(screen.getByRole("link", { name: "Back to home" })).toBeTruthy();
+    // Home is this same page, so going back is a step, not a link.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Back to home",
+    ]);
     // The controls and the clock are gone: there is nothing left to control.
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /mute/i })).toBeNull();
     expect(screen.queryByRole("timer")).toBeNull();
     // The history list is told there is something new.
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["history"] });
@@ -293,6 +297,25 @@ describe("before and after the conversation", () => {
       "[Viva] voice summary (viva over)",
       expect.objectContaining({ packetsSent: 0 }),
     );
+  });
+
+  test("back to home returns to the welcome on this same page", async () => {
+    renderLive({ sessionState: SessionState.COMPLETED, conclusionData: null });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Back to home" }));
+
+    expect(onChooseAgain).toHaveBeenCalledTimes(1);
+  });
+
+  test("a viva that broke offers one way on, since home is where it starts again", () => {
+    renderLive({ sessionState: SessionState.ERROR, error: "Lost." });
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Start again",
+    ]);
   });
 
   test("a viva completed elsewhere, with no score to hand, still leads to the report", () => {
