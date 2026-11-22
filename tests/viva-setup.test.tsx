@@ -57,7 +57,6 @@ const choice = (name: RegExp) =>
 const subjectChoice = () => choice(/^Subject/);
 const chapterChoice = () => choice(/^Chapter/);
 const topicsChoice = () => choice(/^Topics/);
-const voiceChoice = () => choice(/^Voice/);
 const startButton = () =>
   screen.getByRole("button", {
     name: /^(Start viva|Starting)$/,
@@ -210,7 +209,14 @@ describe("what the student is and is not asked", () => {
       /Cell: The Building Block of Life/,
     );
     expect(topicsChoice().textContent).toMatch(/Whole chapter/);
-    expect(voiceChoice().textContent).toMatch(/Kore/);
+  });
+
+  test("the bar asks only what the viva is about: there is no voice to pick", async () => {
+    renderSetup();
+    await subjectsLoaded();
+
+    expect(screen.queryByRole("button", { name: /^Voice/ })).toBeNull();
+    expect(screen.queryByText(/Puck|Charon|Aoede|Fenrir/)).toBeNull();
   });
 
   test("the lists open above the bar and close once something is picked", async () => {
@@ -320,7 +326,7 @@ describe("starting", () => {
     });
   });
 
-  test("chosen topics and voice are what is sent", async () => {
+  test("chosen topics are what is sent, always in the Kore voice", async () => {
     const actor = user();
     renderSetup();
     await chooseCellChapter(actor);
@@ -330,14 +336,10 @@ describe("starting", () => {
     await actor.click(screen.getByRole("button", { name: "Done" }));
     expect(topicsChoice().textContent).toMatch(/1 topic/);
 
-    await actor.click(voiceChoice());
-    await actor.click(screen.getByRole("radio", { name: "Puck" }));
-    expect(voiceChoice().textContent).toMatch(/Puck/);
-
     await actor.click(startButton());
 
     const { selection, voiceName } = onStart.mock.calls[0][0];
-    expect(voiceName).toBe("Puck");
+    expect(voiceName).toBe("Kore");
     expect(selection.chapters[0].topics).toEqual([
       { id: "nucleus", name: "Nucleus" },
     ]);
@@ -355,12 +357,7 @@ describe("starting", () => {
     const button = screen.getByRole("button", { name: "Starting" });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(button.getAttribute("aria-busy")).toBe("true");
-    for (const each of [
-      subjectChoice,
-      chapterChoice,
-      topicsChoice,
-      voiceChoice,
-    ])
+    for (const each of [subjectChoice, chapterChoice, topicsChoice])
       expect(each().disabled).toBe(true);
   });
 

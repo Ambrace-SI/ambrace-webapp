@@ -96,6 +96,13 @@ export enum PlaybackState {
   PLAYING = "playing",
 }
 
+/**
+ * The examiner's voice for every viva. Students are not asked to choose one
+ * for now, to keep starting a viva simple; the list below is what the voice
+ * service accepts, kept for when the choice returns.
+ */
+export const DEFAULT_VOICE = "Kore";
+
 export const AVAILABLE_VOICES = [
   { value: "Kore", label: "Kore (Default)" },
   { value: "Puck", label: "Puck" },

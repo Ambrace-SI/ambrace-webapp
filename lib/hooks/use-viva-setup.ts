@@ -10,8 +10,6 @@ import {
 } from "@/lib/curriculum/selection";
 import { curriculum, isSubjectAvailable } from "@/lib/curriculum/selectors";
 
-export const DEFAULT_VOICE = "Kore";
-
 type CatalogLoad = { attempt: number; failed: boolean };
 
 /**
@@ -27,7 +25,6 @@ export function useVivaSetup(classLevel: number) {
     classLevel,
     (level) => ({ ...initialSelection, classLevel: level }),
   );
-  const [voiceName, setVoiceName] = useState(DEFAULT_VOICE);
   const [attempt, setAttempt] = useState(0);
   const [load, setLoad] = useState<CatalogLoad | null>(null);
 
@@ -68,8 +65,6 @@ export function useVivaSetup(classLevel: number) {
     chapters: view.chapters,
     chapter: view.selectedChapters[0],
     chosen: selection.chapters[0],
-    voiceName,
-    setVoiceName,
     /** The finished choice, or null until a subject and a chapter are picked. */
     resolved: catalog === "ready" ? getCurriculumSelection(selection) : null,
   };

@@ -11,6 +11,7 @@ import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
 import { useVivaStore } from "@/lib/store/viva-store";
 import { BOARD_LABELS, type Profile } from "@/types/profile";
+import { DEFAULT_VOICE } from "@/types/viva";
 
 export type VivaChoice = { selection: CurriculumSelection; voiceName: string };
 
@@ -20,8 +21,9 @@ export type VivaChoice = { selection: CurriculumSelection; voiceName: string };
  * The middle of the screen greets the student and does nothing else. What
  * the viva is about is chosen along the bottom, where a chat app keeps its
  * message box, so there is one page to land on and no form to read. Name and
- * class are not asked: we already know them. The side panel is the way to
- * anywhere else.
+ * class are not asked: we already know them. Nor is the examiner's voice:
+ * every viva uses DEFAULT_VOICE, to keep starting simple. The side panel is
+ * the way to anywhere else.
  */
 export function VivaSetup({
   profile,
@@ -39,7 +41,7 @@ export function VivaSetup({
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!setup.resolved || starting) return;
-    onStart({ selection: setup.resolved, voiceName: setup.voiceName });
+    onStart({ selection: setup.resolved, voiceName: DEFAULT_VOICE });
   }
 
   return (

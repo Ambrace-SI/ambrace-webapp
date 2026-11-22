@@ -23,15 +23,15 @@ import { ENTIRE_CHAPTER, validCustomTopic } from "@/lib/curriculum/selection";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { VivaSetup } from "@/lib/hooks/use-viva-setup";
 import { cn } from "@/lib/utils";
-import { AVAILABLE_VOICES } from "@/types/viva";
 
 const MAX_OWN_TOPICS = 20;
 
-type Panel = "subject" | "chapter" | "topics" | "voice";
+type Panel = "subject" | "chapter" | "topics";
 
 /**
  * Everything a viva needs, along the bottom of home, the way a chat app keeps
- * its message box: subject, chapter, topics, voice, and Start.
+ * its message box: subject, chapter, topics, and Start. It asks only what
+ * the viva is about; the examiner's voice is not a choice (see DEFAULT_VOICE).
  *
  * Each choice opens its list just above the bar on a laptop, and as a sheet
  * from the bottom on a phone, where the thumb already is. A choice only opens
@@ -79,7 +79,6 @@ export function ChoiceBar({
             <Option
               key={subject.id}
               type="radio"
-
               checked={setup.selection.subjectId === subject.id}
               onChange={() =>
                 setup.select({ type: "subject", value: subject.id })
@@ -129,35 +128,6 @@ export function ChoiceBar({
           setup={setup}
           onDone={() => setOpen(null)}
         />
-      </Choice>
-
-      <Divider />
-
-      <Choice
-        label="Voice"
-        value={setup.voiceName}
-        disabled={starting}
-        className="md:w-32"
-        panelClassName="md:w-60"
-        {...panel("voice")}
-      >
-        <p className="px-3 pt-2 pb-1 text-sm text-muted-foreground">
-          Pick the voice that&apos;s easiest for you to follow.
-        </p>
-        <OptionList legend="Examiner's voice">
-          {AVAILABLE_VOICES.map((voice) => (
-            <Option
-              key={voice.value}
-              type="radio"
-
-              checked={setup.voiceName === voice.value}
-              onChange={() => setup.setVoiceName(voice.value)}
-              onPick={() => setOpen(null)}
-            >
-              {voice.value}
-            </Option>
-          ))}
-        </OptionList>
       </Choice>
 
       <Button
