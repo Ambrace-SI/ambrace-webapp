@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AuthHeading } from "@/components/auth/auth-shell";
-import { Orbit } from "@/components/brand/orbit";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
 import { configureAuth } from "@/lib/auth/client";
@@ -78,7 +77,8 @@ export function AuthCallback() {
       className="flex flex-col items-center gap-6 py-16 text-center"
       role="status"
     >
-      <Orbit className="w-20" />
+      {/* No mark of its own: the signed-out frame already greets with one,
+          right above this card. */}
       <p className="label-mono text-muted-foreground">Signing you in</p>
     </div>
   );

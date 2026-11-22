@@ -2,9 +2,20 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * The supplied logo files, by layout and colourway. "horizontal" is the
+ * symbol with the word; "wordmark" is the word alone, for places where the
+ * symbol already appears nearby (the logo kit's own guidance).
+ */
 const FILES = {
-  ink: "/brand/ambrace-lowercase-horizontal-reversed.svg",
-  paper: "/brand/ambrace-lowercase-horizontal.svg",
+  horizontal: {
+    ink: "/brand/ambrace-lowercase-horizontal-reversed.svg",
+    paper: "/brand/ambrace-lowercase-horizontal.svg",
+  },
+  wordmark: {
+    ink: "/brand/ambrace-lowercase-wordmark-reversed.svg",
+    paper: "/brand/ambrace-lowercase-wordmark.svg",
+  },
 } as const;
 
 /**
@@ -18,20 +29,23 @@ const FILES = {
  */
 export function Logo({
   surface,
+  variant = "horizontal",
   className,
   priority = false,
 }: {
   surface: "ink" | "paper" | "theme";
+  variant?: keyof typeof FILES;
   className?: string;
   priority?: boolean;
 }) {
+  const files = FILES[variant];
   // The kit's minimum width for the horizontal logo is 120px.
   const sized = cn("h-auto w-[148px]", className);
 
   if (surface !== "theme") {
     return (
       <Image
-        src={FILES[surface]}
+        src={files[surface]}
         alt="Ambrace"
         width={148}
         height={38}
@@ -47,7 +61,7 @@ export function Logo({
   return (
     <span role="img" aria-label="Ambrace" className="inline-flex">
       <Image
-        src={FILES.paper}
+        src={files.paper}
         alt=""
         width={148}
         height={38}
@@ -55,7 +69,7 @@ export function Logo({
         className={cn(sized, "dark:hidden")}
       />
       <Image
-        src={FILES.ink}
+        src={files.ink}
         alt=""
         width={148}
         height={38}

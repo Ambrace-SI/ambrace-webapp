@@ -24,10 +24,10 @@ export type VivaScope = { subject: string; chapter: string };
  *
  * The screen is almost empty on purpose: this is a conversation, and the
  * student should be listening and speaking, not reading. It follows the
- * student's theme like every other screen, so a light choice stays light. The side panel
- * is put away, so there is no way to wander off by accident. Two controls
- * only: mute, and finish. Everything else on screen answers one question:
- * whose turn is it?
+ * student's theme like every other screen, so a light choice stays light.
+ * The side panel is put away, so there is no way to wander off by accident.
+ * Two controls only: mute, and finish. Everything else on screen answers one
+ * question: whose turn is it?
  */
 export function LiveSession({
   session,

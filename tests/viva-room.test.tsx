@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Activity } from "react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { VivaRoom } from "@/components/viva/viva-room";
 import { APIError } from "@/lib/api/axios";
@@ -291,6 +291,17 @@ describe("after a viva that broke", () => {
 });
 
 describe("the room is the home page", () => {
+  /** The engine's reset, here really clearing the store, as the engine's does. */
+  const resetThatClearsTheStore = () =>
+    engine.resetSession.mockImplementation(() => {
+      calls.push("reset");
+      useVivaStore.getState().resetSession();
+    });
+  // Undone after every test, even one that fails part way.
+  afterEach(() => {
+    engine.resetSession.mockImplementation(() => void calls.push("reset"));
+  });
+
   /** The engine's state, as the voice engine would set it in the store. */
   const engineSets = (
     changes: Partial<ReturnType<typeof useVivaStore.getState>>,
@@ -307,10 +318,7 @@ describe("the room is the home page", () => {
     // The engine sends the student to "/", which is this page, so nothing
     // is unmounted: the room has to notice and step back itself.
     await inLiveViva();
-    engine.resetSession.mockImplementation(() => {
-      calls.push("reset");
-      useVivaStore.getState().resetSession();
-    });
+    resetThatClearsTheStore();
 
     engineSets({
       sessionState: SessionState.IDLE,
@@ -324,7 +332,6 @@ describe("the room is the home page", () => {
     expect(useVivaStore.getState().error).toBe("Microphone access is blocked.");
     expect(wholeScreen).toHaveBeenLastCalledWith(false);
     expect(listRefreshed).toHaveBeenCalledWith({ queryKey: ["history"] });
-    engine.resetSession.mockImplementation(() => void calls.push("reset"));
   });
 
   test("the quiet moment before the engine starts is not mistaken for heading home", async () => {
@@ -340,10 +347,7 @@ describe("the room is the home page", () => {
 
   test("going back by choice does not carry the reason the student already read", async () => {
     await inLiveViva();
-    engine.resetSession.mockImplementation(() => {
-      calls.push("reset");
-      useVivaStore.getState().resetSession();
-    });
+    resetThatClearsTheStore();
     engineSets({
       sessionState: SessionState.ERROR,
       error: "The line dropped.",
@@ -355,7 +359,6 @@ describe("the room is the home page", () => {
 
     expect(screen.getByText(/setup for/)).toBeTruthy();
     expect(useVivaStore.getState().error).toBeNull();
-    engine.resetSession.mockImplementation(() => void calls.push("reset"));
   });
 });
 

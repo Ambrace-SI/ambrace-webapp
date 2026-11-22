@@ -109,6 +109,9 @@
   --surface-active: #cfcdd8; /* Orbit light */
   --scrim: rgb(11 11 16 / 0.35); /* Ink, dimming the page behind a window */
   --scrollbar: #cfcdd8; /* Orbit light, the same tone as the borders */
+  /* The hairline of light along the top of a glass card. Nothing in the
+     palette is lighter than Paper, so on Paper it is white, kept faint. */
+  --glass-highlight: rgb(255 255 255 / 0.6);
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10; /* never white on Ember: 2.8:1 fails, Ink is 6.9:1 */
@@ -158,6 +161,7 @@
   /* Ink again, stronger: a lighter scrim would wash a dark page out. */
   --scrim: rgb(11 11 16 / 0.72);
   --scrollbar: #3a3946; /* Orbit dark */
+  --glass-highlight: rgb(236 235 242 / 0.06); /* Mist, barely there */
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10;

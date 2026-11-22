@@ -59,10 +59,13 @@ afterEach(() => {
 });
 
 test("while Google's answer is being exchanged, the student sees that it is working", () => {
-  render(<AuthCallback />);
+  const { container } = render(<AuthCallback />);
 
   expect(screen.getByRole("status").textContent).toMatch(/Signing you in/);
   expect(replace).not.toHaveBeenCalled();
+  // The frame around it already shows the mark; a second one would stack
+  // under it on a phone.
+  expect(container.querySelector("svg")).toBeNull();
 });
 
 test("a finished sign-in opens the page the student was heading to", () => {
