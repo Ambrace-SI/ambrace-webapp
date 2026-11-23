@@ -208,8 +208,10 @@ jobs:
             echo "${NAME} = ${VALUE}"
           done
 
-          # Optional. Telemetry stays off in a build until posthog_key is set,
-          # and posthog_host falls back to the app's default when absent. A
+          # Analytics. The backend deployment creates both parameters; the
+          # key holds a placeholder until a person pastes the real one in.
+          # The app itself decides whether a value is a key (it must start
+          # with "phc_"), so nothing here needs to know the placeholder. A
           # PostHog project key is public: it ships in the JavaScript.
           for NAME in posthog_key posthog_host; do
             VALUE=$(echo "${PARAMETERS}" | jq -r --arg name "${PREFIX}/${NAME}" '.Parameters[] | select(.Name == $name) | .Value')
@@ -255,6 +257,8 @@ jobs:
           NEXT_PUBLIC_COGNITO_DOMAIN: ${{ needs.settings.outputs.cognito_domain }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ needs.settings.outputs.posthog_key }}
           NEXT_PUBLIC_POSTHOG_HOST: ${{ needs.settings.outputs.posthog_host }}
+          # Sent with every analytics event, so numbers can be matched to a build.
+          NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
 
       - name: Upload built site
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

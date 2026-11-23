@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { privateContentLeaks } from "./helpers/private-content";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -195,4 +196,13 @@ describe("choosing the new password", () => {
       ).disabled,
     ).toBe(false);
   });
+});
+
+test("a recording of the new-password step does not show whose email it is", async () => {
+  render(<ResetPasswordForm />);
+  await requestCode("asha@example.com");
+  await screen.findByRole("heading", { name: "Choose a new password" });
+
+  expect(screen.getByText("asha@example.com")).toBeTruthy();
+  expect(privateContentLeaks(document.body, ["asha@example.com"])).toEqual([]);
 });

@@ -69,6 +69,16 @@ function isPasswordPolicy(name: string, detail: string): boolean {
   return name === "InvalidParameterException" && /password/i.test(detail);
 }
 
+/**
+ * The sign-in service's own name for a failure ("NotAuthorizedException").
+ * Safe to count in analytics: unlike the message, it never names an account.
+ */
+export function authErrorName(error: unknown): string {
+  if (typeof error !== "object" || error === null || !("name" in error))
+    return "Unknown";
+  return String(error.name) || "Unknown";
+}
+
 export function describeAuthError(error: unknown): AuthProblem {
   if (typeof error !== "object" || error === null) return UNKNOWN;
   const name = "name" in error ? String(error.name) : "";

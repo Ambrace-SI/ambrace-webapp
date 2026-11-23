@@ -13,6 +13,7 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/forms/fields";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { configureAuth } from "@/lib/auth/client";
 import { describeAuthError } from "@/lib/auth/errors";
 import { isPasswordAcceptable, looksLikeEmail } from "@/lib/auth/password";
@@ -108,8 +109,10 @@ export function ResetPasswordForm() {
           description={
             <>
               If there&apos;s an account for{" "}
-              <span className="text-foreground">{email}</span>, we&apos;ve sent
-              it a {CODE_LENGTH}-digit code.
+              <span className={`text-foreground ${PRIVATE_CLASS}`}>
+                {email}
+              </span>
+              , we&apos;ve sent it a {CODE_LENGTH}-digit code.
             </>
           }
         />

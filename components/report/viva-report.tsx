@@ -3,9 +3,12 @@
 import { ArrowLeftIcon, ArrowUpRightIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics/events";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
+import { cn } from "@/lib/utils";
 import { httpStatus } from "@/lib/api/errors";
 import { HOME_PATH, REPORT_ID_PARAM } from "@/lib/auth/routes";
 import { useVivaResult } from "@/lib/hooks/use-viva-result";
@@ -28,6 +31,20 @@ const DATE = new Intl.DateTimeFormat("en-IN", {
 export function VivaReport() {
   const id = useSearchParams().get(REPORT_ID_PARAM) ?? "";
   const { data: session, error, isPending, refetch } = useVivaResult(id);
+
+  // Once per report opened, when there is something to count.
+  useEffect(() => {
+    if (!session) return;
+    const viva_session_id = session.viva_session_id;
+    if (!session.feedback) return track("report_empty", { viva_session_id });
+    track("report_viewed", {
+      viva_session_id,
+      score: session.feedback.score,
+      class_level: session.class_level,
+      strong_points: session.feedback.strong_points.length,
+      areas_to_improve: session.feedback.areas_of_improvement.length,
+    });
+  }, [session]);
 
   if (isPending) return <ReportOutline />;
 
@@ -85,7 +102,7 @@ export function VivaReport() {
             / 10
           </span>
         </p>
-        <p className="text-lg">{feedback.summary}</p>
+        <p className={cn("text-lg", PRIVATE_CLASS)}>{feedback.summary}</p>
         {feedback.coverage_note ? (
           <p className="text-sm text-muted-foreground">
             {feedback.coverage_note}
@@ -145,7 +162,7 @@ function Points({
       {points.length === 0 ? (
         <p className="text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className={cn("flex flex-col gap-3", PRIVATE_CLASS)}>
           {points.map((point, index) => (
             <li key={index} className="flex gap-3">
               <span className="flex h-[1.6em] w-5 shrink-0 items-start justify-center pt-1 [&_svg]:size-4">

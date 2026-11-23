@@ -33,16 +33,11 @@ NEXT_PUBLIC_VOICE_DIAGNOSTICS=true
 
 ## PostHog Setup
 
-Voice telemetry is anonymous technical performance telemetry.
-PostHog does not receive student names, emails, Clerk IDs, transcripts, raw audio, or credentials.
-
-PostHog is integrated via `posthog-js` with strict privacy constraints:
-
-- **Autocapture:** Disabled (`autocapture: false`)
-- **Session Replay:** Disabled (`disable_session_recording: true`)
-- **Pageviews:** Disabled (`capture_pageview: false`)
-- **PII / Identities:** Person profiles set to `"never"`. No student names, emails, Clerk user IDs, or transcripts are sent.
-- **Payload Sanitization:** Raw PCM audio buffers, base64 data, error messages, and API tokens are strictly filtered out before dispatch.
+The voice events below are technical measurements, sent through the same
+PostHog setup as the rest of the app. That setup (who a student is to PostHog,
+what is recorded, and what never leaves the browser) is described in
+[analytics.md](analytics.md). While a viva is on, every voice event carries
+its `viva_session_id`.
 
 ### Event Names & Vocabulary
 

@@ -19,6 +19,7 @@ import { panelPreference } from "@/lib/app/panel-preference";
 import { useWholeScreen } from "@/lib/app/whole-screen";
 import type { Me } from "@/types/profile";
 import type { HistoryResponse, VivaSessionSummary } from "@/types/viva";
+import { privateContentLeaks } from "./helpers/private-content";
 
 /**
  * The side panel, used the way a student uses it: real panel, real list, real
@@ -1023,4 +1024,14 @@ describe("on a phone", () => {
       "bottom",
     );
   });
+});
+
+test("a recording of the side panel does not show who is signed in", async () => {
+  renderShell({
+    ...ME,
+    profile: { ...ME.profile!, school_name: "Hill View School" },
+  });
+
+  await screen.findByRole("button", { name: /Account menu for Asha Rao/ });
+  expect(privateContentLeaks(document.body, ["Asha", "Hill View"])).toEqual([]);
 });

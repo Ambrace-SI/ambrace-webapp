@@ -3,12 +3,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRightIcon, Loader2Icon, MicIcon, MicOffIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { LiveCaptions } from "@/components/viva/live-captions";
 import { SessionClock } from "@/components/viva/session-clock";
 import { VoiceOrb } from "@/components/viva/voice-orb";
 import { Button } from "@/components/ui/button";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { reportPath } from "@/lib/auth/routes";
 import { HISTORY_KEY } from "@/lib/hooks/use-history";
 import { useMicrophoneUnheard } from "@/lib/hooks/use-microphone-unheard";
@@ -33,10 +34,13 @@ export function LiveSession({
   session,
   scope,
   onChooseAgain,
+  onMicrophoneUnheard,
 }: {
   session: ReturnType<typeof useVivaSession>;
   scope: VivaScope;
   onChooseAgain: () => void;
+  /** Told each time the microphone goes unheard on the student's turn. */
+  onMicrophoneUnheard: () => void;
 }) {
   const queryClient = useQueryClient();
   const moment = liveMoment(session);
@@ -58,8 +62,11 @@ export function LiveSession({
   useEffect(() => {
     if (over) logVoiceSummary("viva over");
   }, [over]);
+  const reportUnheard = useEffectEvent(onMicrophoneUnheard);
   useEffect(() => {
-    if (unheard) logVoiceSummary("microphone unheard");
+    if (!unheard) return;
+    logVoiceSummary("microphone unheard");
+    reportUnheard();
   }, [unheard]);
 
   async function end() {
@@ -216,7 +223,9 @@ function Finished({
           </h1>
         )}
         {summary ? (
-          <p className="text-lg text-muted-foreground">{summary}</p>
+          <p className={cn("text-lg text-muted-foreground", PRIVATE_CLASS)}>
+            {summary}
+          </p>
         ) : null}
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">

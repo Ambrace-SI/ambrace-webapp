@@ -4,8 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import { privateContentLeaks } from "./helpers/private-content";
 
 let query = "";
+// What the screen reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(query),
 }));
@@ -293,4 +298,71 @@ describe("arriving from sign-in with an unconfirmed account", () => {
       screen.getByRole("heading", { name: "Create your account" }),
     ).toBeTruthy();
   });
+});
+
+describe("what analytics is told", () => {
+  beforeEach(() => analytics.track.mockClear());
+
+  test("an account created, then the email confirmed, then the sign-in that follows", async () => {
+    render(<SignUpForm />);
+    const user = await createAccount();
+    await screen.findByRole("heading", { name: "Check your email" });
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["account_created", { method: "password" }],
+    ]);
+
+    await user.type(screen.getByLabelText("Confirmation code"), "123456");
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
+
+    expect(analytics.track.mock.calls.slice(1)).toEqual([
+      ["email_confirmed"],
+      ["signed_in", { method: "password" }],
+    ]);
+  });
+
+  test("an account that could not be created is not counted as one", async () => {
+    auth.signUp.mockRejectedValue({ name: "UsernameExistsException" });
+    render(<SignUpForm />);
+
+    await createAccount();
+    await screen.findByRole("alert");
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  test("a wrong code is not a confirmed email", async () => {
+    auth.confirmSignUp.mockRejectedValue({ name: "CodeMismatchException" });
+    render(<SignUpForm />);
+    const user = await createAccount();
+    await screen.findByRole("heading", { name: "Check your email" });
+    analytics.track.mockClear();
+
+    await user.type(screen.getByLabelText("Confirmation code"), "123456");
+    await waitFor(() => expect(auth.confirmSignUp).toHaveBeenCalled());
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  test("leaving for Google from sign-up says where it began", async () => {
+    auth.signInWithRedirect.mockReturnValue(new Promise(() => undefined));
+    render(<SignUpForm />);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: /Continue with Google/ }));
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["google_sign_in_started", { from: "sign_up" }],
+    ]);
+  });
+});
+
+test("a recording of the code step does not show whose email it is", async () => {
+  render(<SignUpForm />);
+  await createAccount("asha@example.com");
+  await screen.findByRole("heading", { name: "Check your email" });
+
+  expect(screen.getByText("asha@example.com")).toBeTruthy();
+  expect(privateContentLeaks(document.body, ["asha@example.com"])).toEqual([]);
 });

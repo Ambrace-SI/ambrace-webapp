@@ -11,6 +11,8 @@ connect_sources = [
   "https://ambrace.auth.ap-south-1.amazoncognito.com",
   # The live viva: the browser streams audio straight to Gemini.
   "wss://generativelanguage.googleapis.com",
-  # Voice-quality telemetry (PostHog). Sent only when the build has a key.
+  # Analytics (PostHog), only when the build has a key: events and recordings
+  # go to the first, and the project's settings are read from the second.
   "https://us.i.posthog.com",
+  "https://us-assets.i.posthog.com",
 ]

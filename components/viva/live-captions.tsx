@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import type { Transcript } from "@/lib/store/viva-store";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,11 @@ export function LiveCaptions({
       role="log"
       aria-label="Conversation"
       tabIndex={0}
-      className="max-h-full min-h-0 overflow-y-auto overscroll-contain rounded-lg outline-none [overflow-anchor:none] focus-visible:ring-3 focus-visible:ring-ring/50"
+      className={cn(
+        "max-h-full min-h-0 overflow-y-auto overscroll-contain rounded-lg outline-none [overflow-anchor:none] focus-visible:ring-3 focus-visible:ring-ring/50",
+        // What the student and the examiner said.
+        PRIVATE_CLASS,
+      )}
       onScroll={(event) => {
         const element = event.currentTarget;
         following.current =

@@ -7,6 +7,7 @@ import { VivaSetup, type VivaChoice } from "@/components/viva/viva-setup";
 import { curriculum } from "@/lib/curriculum/selectors";
 import { useVivaStore } from "@/lib/store/viva-store";
 import type { Profile } from "@/types/profile";
+import { privateContentLeaks } from "./helpers/private-content";
 
 const PROFILE: Profile = {
   name: "Asha Rao",
@@ -538,4 +539,13 @@ describe("when the subject list will not load", () => {
     ).toBeTruthy();
     expect(subjectChoice().disabled).toBe(true);
   });
+});
+
+test("a recording of the welcome does not show the student's name or school", () => {
+  renderSetup();
+
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+    "Hello, Asha.",
+  );
+  expect(privateContentLeaks(document.body, ["Asha", "Hill View"])).toEqual([]);
 });

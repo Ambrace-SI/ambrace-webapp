@@ -7,11 +7,12 @@ import {
   calculatePcmDurationMs,
   VoiceTelemetry,
 } from "../lib/telemetry/voice-telemetry";
+import posthog from "posthog-js/dist/module.full.no-external";
 import {
   captureVoiceEvent,
   initPostHog,
+  loadPostHog,
   sanitizeErrorMessage,
-  posthog,
 } from "../lib/analytics/posthog";
 
 test("server-observed response latency is independent of continuous silence packets", () => {
@@ -513,12 +514,13 @@ test("PostHog adapter safely no-ops without credentials", () => {
   });
 });
 
-test("privacy guarantees: voice analytics events and snapshots never contain PII, raw errors, audio buffers, or credentials", () => {
+test("privacy guarantees: voice analytics events and snapshots never contain PII, raw errors, audio buffers, or credentials", async () => {
   let capturedEvent: string | null = null;
   let capturedPayload: Record<string, unknown> | null = null;
 
-  // Ensure test key is present so posthog is active
+  // Ensure test key and address are present so posthog is active
   process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_dummy_key";
+  process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
 
   // Provide mock window and intercept posthog methods
   const globalObj = globalThis as unknown as Record<string, unknown>;
@@ -534,6 +536,8 @@ test("privacy guarantees: voice analytics events and snapshots never contain PII
   };
 
   try {
+    // PostHog's code is fetched on demand; wait for it so events are sent at once.
+    await loadPostHog();
     // Attempt to pass forbidden fields (PII, raw errors, audio buffers, tokens)
     captureVoiceEvent("voice_connection_error", {
       telemetry_session_id: "anon-uuid-555",
@@ -638,12 +642,13 @@ test("automatic kickoff and initialization-to-first-audio diagnostics are sessio
   );
 });
 
-test("production startup analytics record send outcome, received audio and rendered playback once per session", () => {
+test("production startup analytics record send outcome, received audio and rendered playback once per session", async () => {
   const globalObj = globalThis as unknown as Record<string, unknown>;
   const originalWindow = globalObj.window;
   const originalKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   globalObj.window = {};
   process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_dummy_key";
+  process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
   let now = 100;
   vi.spyOn(performance, "now").mockImplementation(() => now);
   // The real SDK returns its own instance from init.
@@ -655,6 +660,8 @@ test("production startup analytics record send outcome, received audio and rende
   });
 
   try {
+    // PostHog's code is fetched on demand; wait for it so events are sent at once.
+    await loadPostHog();
     const telemetry = new VoiceTelemetry();
     telemetry.onSessionInitStart("gemini-3.8-live", "balanced-v1");
     const firstId = telemetry.getSnapshot().telemetrySessionId;

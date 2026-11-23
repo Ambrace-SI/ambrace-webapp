@@ -1,5 +1,7 @@
 import { signOut } from "aws-amplify/auth";
 
+import { track } from "@/lib/analytics/events";
+import { forgetStudent } from "@/lib/analytics/identity";
 import { getSignInAccount } from "@/lib/auth/account";
 import { configureAuth } from "@/lib/auth/client";
 import { SIGN_IN_PATH } from "@/lib/auth/routes";
@@ -36,6 +38,11 @@ export async function leaveAmbrace(): Promise<void> {
   configureAuth();
   const toSignIn = () => window.location.assign(SIGN_IN_PATH);
   const google = await signedInWithGoogle();
+
+  // Said while the student is still known, then the device forgets them, so
+  // whoever uses this browser next starts as a stranger.
+  track("signed_out");
+  forgetStudent();
 
   try {
     await signOut();

@@ -7,9 +7,11 @@ import { WelcomeMark } from "@/components/brand/welcome-mark";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
 import { ChoiceBar } from "@/components/viva/choice-bar";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
 import { useVivaStore } from "@/lib/store/viva-store";
+import { cn } from "@/lib/utils";
 import { BOARD_LABELS, type Profile } from "@/types/profile";
 import { DEFAULT_VOICE } from "@/types/viva";
 
@@ -84,7 +86,11 @@ function Greeting({ profile, line }: { profile: Profile; line: string }) {
   return (
     <div className="flex max-w-2xl flex-col items-center gap-3">
       <p
-        className="label-mono animate-rise text-muted-foreground"
+        className={cn(
+          "label-mono animate-rise text-muted-foreground",
+          // Carries the school's name.
+          PRIVATE_CLASS,
+        )}
         style={after(500)}
       >
         {details.join(" · ")}
@@ -93,7 +99,7 @@ function Greeting({ profile, line }: { profile: Profile; line: string }) {
         className="animate-rise text-5xl font-light tracking-tight sm:text-6xl"
         style={after(620)}
       >
-        Hello, {firstName}.
+        Hello, <span className={PRIVATE_CLASS}>{firstName}</span>.
       </h1>
       <p
         className="animate-rise text-lg text-pretty text-muted-foreground"

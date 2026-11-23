@@ -10,6 +10,15 @@ import { useIsMobile } from "@/lib/hooks/use-mobile";
  * or something breaks, signing out, and the two things the side panel has to
  * know about the device (its width, and whether the panel was left folded).
  */
+// What signing out reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ order: [] as string[] }));
+vi.mock("@/lib/analytics/events", () => ({
+  track: (name: string) => void analytics.order.push(name),
+}));
+vi.mock("@/lib/analytics/identity", () => ({
+  forgetStudent: () => void analytics.order.push("forget"),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -274,5 +283,33 @@ describe("knowing a phone from a laptop", () => {
     unmount();
 
     expect(device.listeners.size).toBe(0);
+  });
+});
+
+describe("what analytics is told on signing out", () => {
+  beforeEach(() => {
+    analytics.order.length = 0;
+    signOut.mockReset();
+    signOut.mockImplementation(async () => void analytics.order.push("ended"));
+    getSignInAccount.mockReset();
+    getSignInAccount.mockResolvedValue({ email: null, method: "password" });
+    vi.stubGlobal("location", { ...window.location, assign: vi.fn() });
+  });
+
+  test("the sign-out is counted while the student is still known, then the device forgets them, then the session ends", async () => {
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+
+    expect(analytics.order).toEqual(["signed_out", "forget", "ended"]);
+  });
+
+  test("the device forgets the student even when ending the session fails", async () => {
+    signOut.mockRejectedValue(new Error("offline"));
+    const { leaveAmbrace } = await import("@/lib/app/sign-out");
+
+    await leaveAmbrace();
+
+    expect(analytics.order).toEqual(["signed_out", "forget"]);
   });
 });

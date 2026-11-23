@@ -1,56 +1,176 @@
 /**
- * PostHog Analytics Adapter for Veenoe Voice v2 Telemetry (VEENOE-16)
+ * The one place that talks to PostHog.
  *
- * Design Decisions:
- * 1. Anonymous technical performance telemetry only.
- *    PostHog does not receive student names, emails, Clerk IDs, transcripts, raw audio, or credentials.
- * 2. Safe no-op when NEXT_PUBLIC_POSTHOG_KEY is not configured or in SSR.
- * 3. Person profiles disabled ("never"): no user identities or personal tracking.
- * 4. Token & URL sanitization: strips all credentials, ephemeral tokens, and connection URLs.
- * 5. Resilient: network/ad-blocker errors are swallowed safely and never bubble to viva runtime.
+ * 1. Off unless a project key and an address are configured, and never
+ *    during a server render.
+ * 2. PostHog's code is fetched after the app has started, as a file of our
+ *    own, so no page waits for it. Anything reported before it arrives is
+ *    held and sent, in order, with the time it actually happened.
+ * 3. Nothing is downloaded from PostHog: the recorder ships inside that file,
+ *    so the content security policy allows no third-party script.
+ * 4. What may be sent is decided in `privacy.ts` and `cleanProperties`.
+ * 5. A failure here is swallowed. Analytics must never interrupt a viva.
  */
 
-import posthog from "posthog-js";
+import { scrubSecrets, withoutQuery } from "./privacy";
 
-let isPostHogInitialized = false;
+/**
+ * The "full, no external" build carries the session recorder and the rest of
+ * PostHog's optional code inside it, and cannot load scripts from anywhere.
+ */
+const loadVendor = () => import("posthog-js/dist/module.full.no-external");
 
-export function initPostHog(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
+export type PostHogClient = Awaited<ReturnType<typeof loadVendor>>["default"];
+type PostHogOptions = NonNullable<Parameters<PostHogClient["init"]>[1]>;
 
-  if (isPostHogInitialized) {
-    return true;
-  }
+export type AnalyticsSettings = {
+  apiKey: string;
+  apiHost: string;
+  /** The commit the site was built from, when the build was told. */
+  appVersion: string | null;
+};
 
-  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const apiHost =
-    process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+/** Every PostHog project key starts this way. Anything else is not a key. */
+const PROJECT_KEY_PREFIX = "phc_";
 
-  if (!apiKey || apiKey.trim() === "") {
-    return false;
-  }
+/**
+ * The settings analytics runs on, or null when it is off.
+ *
+ * Both values must be real. A new environment holds a placeholder where the
+ * key will go, and a placeholder is not a key; with no address there is
+ * nowhere the content security policy would let events go.
+ */
+export function readAnalyticsSettings(
+  env: Record<string, string | undefined> = {
+    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
+  },
+): AnalyticsSettings | null {
+  const apiKey = env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? "";
+  const apiHost = env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ?? "";
+  if (!apiKey.startsWith(PROJECT_KEY_PREFIX)) return null;
+  if (!apiHost.startsWith("https://")) return null;
+  return {
+    apiKey,
+    apiHost,
+    appVersion: env.NEXT_PUBLIC_APP_VERSION?.trim() || null,
+  };
+}
 
+/** Everything PostHog is told to do. Kept apart from loading so it can be read and tested. */
+export function buildPostHogOptions(apiHost: string): PostHogOptions {
+  return {
+    api_host: apiHost,
+    // A dated snapshot of PostHog's defaults, so an upgrade changes nothing
+    // here until this date is moved on purpose.
+    defaults: "2026-01-30",
+    // A profile exists only for someone who signed in. Visitors on the
+    // sign-in pages stay anonymous until they do.
+    person_profiles: "identified_only",
+    // No cookies: the student is remembered in this browser's own storage.
+    persistence: "localStorage",
+    // The app changes page without reloading; follow the address bar.
+    capture_pageview: "history_change",
+    capture_pageleave: true,
+    autocapture: true,
+    capture_exceptions: true,
+    // Addresses can carry sign-in codes; error text can carry token addresses.
+    before_send: (event) => (event ? scrubSecrets(event) : event),
+    disable_session_recording: false,
+    // The console can repeat what was said in a viva. It is not recorded.
+    enable_recording_console_log: false,
+    session_recording: {
+      // Whatever is typed is masked. Whatever is marked `PRIVATE_CLASS` is
+      // blocked by the recorder's own default; nothing here turns that off.
+      maskAllInputs: true,
+      maskInputOptions: { password: true },
+      recordHeaders: false,
+      recordBody: false,
+      // The live connection's address carries its token. Keep the path only.
+      maskCapturedNetworkRequestFn: (request) => ({
+        ...request,
+        name: withoutQuery(request.name),
+      }),
+    },
+  };
+}
+
+type Action = (client: PostHogClient) => void;
+
+/** How much is held while PostHog's code is on its way. A viva's first seconds fit many times over. */
+const MAX_WAITING = 500;
+
+let client: PostHogClient | null = null;
+let loading: Promise<PostHogClient | null> | null = null;
+let waiting: Action[] = [];
+
+function run(action: Action, ready: PostHogClient): void {
   try {
-    posthog.init(apiKey.trim(), {
-      api_host: apiHost.trim(),
-      autocapture: false,
-      capture_pageview: false,
-      capture_pageleave: false,
-      disable_session_recording: true,
-      advanced_disable_decide: true,
-      person_profiles: "never", // Anonymous performance analytics only - no person profiles
-      persistence: "memory", // Keep state lightweight without cookie tracking
-      loaded: () => {
-        isPostHogInitialized = true;
-      },
-    });
-    isPostHogInitialized = true;
-    return true;
+    action(ready);
   } catch (err) {
-    console.warn("[PostHog] Failed to initialize:", err);
-    return false;
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[PostHog] Call failed:", err);
+    }
   }
+}
+
+async function start(
+  settings: AnalyticsSettings,
+): Promise<PostHogClient | null> {
+  try {
+    const { default: posthog } = await loadVendor();
+    posthog.init(settings.apiKey, buildPostHogOptions(settings.apiHost));
+    // Every event says which build sent it, so a change in the numbers can be
+    // matched to a release.
+    if (settings.appVersion)
+      posthog.register({ app_version: settings.appVersion });
+    client = posthog;
+    const held = waiting;
+    waiting = [];
+    for (const action of held) run(action, posthog);
+    return posthog;
+  } catch (err) {
+    // Blocked, offline, or refused: analytics stay off for this visit.
+    waiting = [];
+    console.warn("[PostHog] Failed to start:", err);
+    return null;
+  }
+}
+
+/**
+ * Starts PostHog, once. Resolves when it is ready, or with null when
+ * analytics are off or could not start. Nothing needs to wait for this.
+ */
+export function loadPostHog(): Promise<PostHogClient | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (loading) return loading;
+  const settings = readAnalyticsSettings();
+  if (!settings) return Promise.resolve(null);
+  loading = start(settings);
+  return loading;
+}
+
+/**
+ * Begins loading analytics. Returns at once with whether analytics are on,
+ * so the caller never waits on a download.
+ */
+export function initPostHog(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!readAnalyticsSettings()) return false;
+  void loadPostHog();
+  return true;
+}
+
+/**
+ * Runs something against PostHog: now if it is ready, otherwise as soon as it
+ * is, in the order asked. Does nothing when analytics are off. Every call
+ * from the app goes through here.
+ */
+export function withPostHog(action: Action): void {
+  if (client) return run(action, client);
+  if (!initPostHog()) return;
+  if (waiting.length < MAX_WAITING) waiting.push(action);
 }
 
 export type VoiceEventName =
@@ -205,8 +325,9 @@ const FORBIDDEN_PROPERTY_KEYS = new Set([
 ]);
 
 /**
- * Clean payload to strip undefined values, enforce strict anonymity,
- * and prevent any unintended PII or audio data leakage.
+ * Clean payload to strip undefined values and prevent any unintended PII or
+ * audio data leakage. Who the student is travels as PostHog's own identity,
+ * never as a property.
  */
 function cleanProperties(
   properties: Record<string, unknown>,
@@ -235,6 +356,17 @@ function cleanProperties(
   return cleaned;
 }
 
+/** Sends one event, with anything private or oversized removed first. */
+export function captureEvent(
+  eventName: string,
+  properties: Record<string, unknown> = {},
+): void {
+  const cleaned = cleanProperties(properties);
+  // Stamped now, so an event held while PostHog loads keeps its real time.
+  const timestamp = new Date();
+  withPostHog((ready) => ready.capture(eventName, cleaned, { timestamp }));
+}
+
 /**
  * Capture a voice telemetry event safely in PostHog.
  * Never throws, gracefully no-ops when PostHog is unconfigured.
@@ -243,21 +375,5 @@ export function captureVoiceEvent(
   eventName: VoiceEventName,
   properties: VoiceEventProperties,
 ): void {
-  try {
-    if (!isPostHogInitialized) {
-      const initialized = initPostHog();
-      if (!initialized) {
-        return;
-      }
-    }
-
-    const payload = cleanProperties(properties);
-    posthog.capture(eventName, payload);
-  } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(`[PostHog] Error capturing event ${eventName}:`, err);
-    }
-  }
+  captureEvent(eventName, properties);
 }
-
-export { posthog };

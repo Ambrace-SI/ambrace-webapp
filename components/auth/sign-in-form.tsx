@@ -13,8 +13,9 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/forms/fields";
+import { track } from "@/lib/analytics/events";
 import { configureAuth } from "@/lib/auth/client";
-import { describeAuthError } from "@/lib/auth/errors";
+import { authErrorName, describeAuthError } from "@/lib/auth/errors";
 import { rememberPendingEmail, rememberReturnPath } from "@/lib/auth/handoff";
 import { looksLikeEmail } from "@/lib/auth/password";
 import {
@@ -47,11 +48,16 @@ export function SignInForm() {
     try {
       configureAuth();
       rememberReturnPath(returnPath);
+      track("google_sign_in_started", { from: "sign_in" });
       await signInWithRedirect({ provider: "Google" });
       // The browser is now leaving for Google; keep the button busy.
     } catch (error) {
       const problem = describeAuthError(error);
       if (problem.action === "already-signed-in") return enterApp();
+      track("sign_in_failed", {
+        method: "google",
+        reason: authErrorName(error),
+      });
       setFormError(problem.message);
       setPending(null);
     }
@@ -73,7 +79,10 @@ export function SignInForm() {
     try {
       configureAuth();
       const result = await signIn({ username: email.trim(), password });
-      if (result.isSignedIn) return enterApp();
+      if (result.isSignedIn) {
+        track("signed_in", { method: "password" });
+        return enterApp();
+      }
       if (result.nextStep.signInStep === "CONFIRM_SIGN_UP") {
         rememberPendingEmail(email);
         return router.push(`${SIGN_UP_PATH}?step=confirm`);
@@ -86,6 +95,10 @@ export function SignInForm() {
         rememberPendingEmail(email);
         return router.push(`${SIGN_UP_PATH}?step=confirm`);
       }
+      track("sign_in_failed", {
+        method: "password",
+        reason: authErrorName(error),
+      });
       setFormError(problem.message);
     }
     setPending(null);

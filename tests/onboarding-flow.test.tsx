@@ -6,8 +6,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import type { Me, ProfileUpdate } from "@/types/profile";
+import { privateContentLeaks } from "./helpers/private-content";
 
 const router = { replace: vi.fn(), push: vi.fn() };
+// What the screen reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/image", () => ({
   default: ({ alt }: { alt: string }) => <span>{alt}</span>,
@@ -280,7 +285,10 @@ describe("details of the flow", () => {
 
     await fillBasics(user);
 
-    expect(screen.getByText(/You're all set, Asha\./)).toBeTruthy();
+    // The name sits in an element of its own, so recordings can leave it out.
+    expect(screen.getByText("Asha").closest("p")?.textContent).toMatch(
+      /^You're all set, Asha\. /,
+    );
   });
 
   test("an expired session during saving says to sign in again", async () => {
@@ -363,5 +371,88 @@ describe("details of the flow", () => {
 
     await screen.findByText(/couldn't save that/);
     expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("what analytics is told", () => {
+  beforeEach(() => analytics.track.mockClear());
+
+  async function finishStepOne() {
+    const user = renderFlow();
+    await user.type(
+      screen.getByLabelText("What should we call you?"),
+      "Asha Rao",
+    );
+    await user.click(screen.getByRole("radio", { name: "9" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "A little more, if you like" });
+    return user;
+  }
+
+  test("onboarding is complete once the name and class are saved, with the class and not the name", async () => {
+    await finishStepOne();
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["onboarding_completed", { class_level: 9 }],
+    ]);
+  });
+
+  test("going back and continuing again does not complete onboarding twice", async () => {
+    const user = await finishStepOne();
+
+    await user.click(
+      screen.getByRole("button", { name: "Back to name and class" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "A little more, if you like" });
+
+    expect(saveProfile).toHaveBeenCalledTimes(2);
+    expect(analytics.track.mock.calls).toEqual([
+      ["onboarding_completed", { class_level: 9 }],
+    ]);
+  });
+
+  test("a save that failed is not a completed onboarding", async () => {
+    saveProfile.mockRejectedValue(new Error("down"));
+    const user = renderFlow();
+    await user.type(
+      screen.getByLabelText("What should we call you?"),
+      "Asha Rao",
+    );
+    await user.click(screen.getByRole("radio", { name: "9" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("alert");
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  test("the extras say which board, and only whether a school was given", async () => {
+    const user = await finishStepOne();
+    analytics.track.mockClear();
+
+    await user.click(screen.getByRole("radio", { name: "ICSE" }));
+    await user.type(screen.getByLabelText(/School name/), "Hill View School");
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["onboarding_extras_saved", { board: "ICSE", has_school: true }],
+    ]);
+  });
+
+  test("skipping the extras says nothing more", async () => {
+    const user = await finishStepOne();
+    analytics.track.mockClear();
+
+    await user.click(screen.getByRole("button", { name: "Skip for now" }));
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  test("a recording of the second step does not show the student's name", async () => {
+    await finishStepOne();
+
+    expect(screen.getByText("Asha")).toBeTruthy();
+    expect(privateContentLeaks(document.body, ["Asha"])).toEqual([]);
   });
 });

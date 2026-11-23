@@ -7,6 +7,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ReportOutline, VivaReport } from "@/components/report/viva-report";
 import { APIError } from "@/lib/api/axios";
 import type { VivaSession } from "@/types/viva";
+import { privateContentLeaks } from "./helpers/private-content";
+
+// What the screen reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -184,4 +189,63 @@ describe("when there is nothing to show", () => {
       ),
     );
   });
+});
+
+describe("what analytics is told", () => {
+  beforeEach(() => analytics.track.mockClear());
+
+  test("a report that was read: the score and the counts, none of the words", async () => {
+    renderReport();
+    await screen.findByRole("heading", { level: 1 });
+
+    await waitFor(() =>
+      expect(analytics.track.mock.calls).toEqual([
+        [
+          "report_viewed",
+          {
+            viva_session_id: "session-1",
+            score: 7,
+            class_level: "9",
+            strong_points: 1,
+            areas_to_improve: 1,
+          },
+        ],
+      ]),
+    );
+  });
+
+  test("a viva that ended before a report was written", async () => {
+    getVivaSession.mockResolvedValue({ ...SESSION, feedback: null });
+    renderReport();
+    await screen.findByText("There's no report for this viva");
+
+    await waitFor(() =>
+      expect(analytics.track.mock.calls).toEqual([
+        ["report_empty", { viva_session_id: "session-1" }],
+      ]),
+    );
+  });
+
+  test("a report that could not be loaded is not a report viewed", async () => {
+    getVivaSession.mockRejectedValue(new APIError("gone", 404));
+    renderReport();
+    await screen.findByText("We can't find that report");
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+test("a recording of the report shows the score, and none of the examiner's notes on what was said", async () => {
+  renderReport();
+  await screen.findByRole("heading", { level: 1 });
+
+  expect(
+    privateContentLeaks(document.body, [
+      "Clear on cell structure; needed a hint on organelles.",
+      "Named the nucleus unprompted.",
+      "Mixes up plant and animal cells.",
+      "Draw both cells and label three differences.",
+    ]),
+  ).toEqual([]);
+  expect(screen.getByLabelText("Score").closest(".ph-no-capture")).toBeNull();
 });
