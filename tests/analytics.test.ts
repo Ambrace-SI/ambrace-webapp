@@ -82,6 +82,7 @@ async function freshAnalytics(
 
 beforeEach(() => {
   vendor.state.identified = null;
+  window.localStorage.clear();
   for (const mock of Object.values(vendor.client)) mock.mockClear();
 });
 
@@ -426,6 +427,20 @@ describe("what an event may carry", () => {
   });
 });
 
+describe("the fingerprint that notices a change", () => {
+  test("is the same for the same text and different for different text", async () => {
+    const { identity } = await freshAnalytics();
+
+    expect(identity.fingerprint("class 9")).toBe(
+      identity.fingerprint("class 9"),
+    );
+    expect(identity.fingerprint("class 9")).not.toBe(
+      identity.fingerprint("class 10"),
+    );
+    expect(identity.fingerprint("")).toMatch(/^[0-9a-f]{8}$/);
+  });
+});
+
 describe("who the events belong to", () => {
   test("a student is a person: their account ID, with name, email, class, board and school", async () => {
     const { posthog, identity } = await freshAnalytics();
@@ -506,12 +521,121 @@ describe("who the events belong to", () => {
     expect(order).toEqual(["reset", "identify user-2"]);
   });
 
+  describe("on a later page load", () => {
+    /** The page is loaded again: fresh code, the same browser storage. */
+    async function loadedAgain() {
+      const { posthog, identity } = await freshAnalytics();
+      await posthog.loadPostHog();
+      vendor.client.identify.mockClear();
+      return identity;
+    }
+
+    async function identifiedOnce() {
+      const identity = await loadedAgain();
+      identity.identifyStudent(ME, "asha@example.com");
+      expect(vendor.client.identify).toHaveBeenCalledTimes(1);
+    }
+
+    test("a student PostHog already knows, with nothing changed, is not announced again", async () => {
+      await identifiedOnce();
+
+      (await loadedAgain()).identifyStudent(ME, "asha@example.com");
+
+      expect(vendor.client.identify).not.toHaveBeenCalled();
+    });
+
+    test("a changed detail is sent", async () => {
+      await identifiedOnce();
+
+      (await loadedAgain()).identifyStudent(
+        { ...ME, profile: { ...ME.profile!, class_level: 10 } },
+        "asha@example.com",
+      );
+
+      expect(vendor.client.identify).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ class_level: 10 }),
+      );
+    });
+
+    test("an email that has only now become known is sent", async () => {
+      const first = await loadedAgain();
+      first.identifyStudent(ME, null);
+
+      (await loadedAgain()).identifyStudent(ME, "asha@example.com");
+
+      expect(vendor.client.identify).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ email: "asha@example.com" }),
+      );
+    });
+
+    test("if PostHog's own memory of the student was cleared, they are announced again", async () => {
+      await identifiedOnce();
+      vendor.state.identified = null;
+
+      (await loadedAgain()).identifyStudent(ME, "asha@example.com");
+
+      expect(vendor.client.identify).toHaveBeenCalledTimes(1);
+    });
+
+    test("after signing out, the next sign-in is announced even with the same details", async () => {
+      await identifiedOnce();
+      (await loadedAgain()).forgetStudent();
+
+      (await loadedAgain()).identifyStudent(ME, "asha@example.com");
+
+      expect(vendor.client.identify).toHaveBeenCalledTimes(1);
+    });
+
+    test("a different student is announced, and the one before is forgotten first", async () => {
+      await identifiedOnce();
+
+      (await loadedAgain()).identifyStudent(
+        { ...ME, user_id: "user-2" },
+        "asha@example.com",
+      );
+
+      expect(vendor.client.reset).toHaveBeenCalledTimes(1);
+      expect(vendor.client.identify.mock.calls[0][0]).toBe("user-2");
+    });
+
+    test("with browser storage unavailable the student is still announced, every time", async () => {
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("storage is off");
+      });
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("storage is off");
+      });
+      const identity = await loadedAgain();
+
+      identity.identifyStudent(ME, "asha@example.com");
+      identity.identifyStudent(ME, "asha@example.com");
+
+      expect(vendor.client.identify).toHaveBeenCalledTimes(2);
+    });
+
+    test("what is noted in the browser is a fingerprint, with nothing that names the student", async () => {
+      await identifiedOnce();
+
+      const noted = window.localStorage.getItem(
+        "ambrace.analytics.person-sent",
+      );
+
+      expect(noted).toMatch(/^[0-9a-f]{8}$/);
+    });
+  });
+
   test("signing out forgets the student on this device", async () => {
     const { posthog, identity } = await freshAnalytics();
     await posthog.loadPostHog();
 
+    identity.identifyStudent(ME, "asha@example.com");
+
     identity.forgetStudent();
 
     expect(vendor.client.reset).toHaveBeenCalledTimes(1);
+    // Nothing that names the student is left behind in the browser.
+    expect(JSON.stringify({ ...window.localStorage })).not.toMatch(/Asha/);
   });
 });
