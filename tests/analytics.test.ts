@@ -374,6 +374,29 @@ describe("removing credentials", () => {
     });
   });
 
+  test("an event's timestamp survives: PostHog refuses an event whose time is not a date", () => {
+    const timestamp = new Date("2026-11-23T10:00:00Z");
+
+    const scrubbed = scrubSecrets({
+      event: "$pageview",
+      timestamp,
+      properties: { $current_url: "https://x.test/cb?code=abc" },
+    });
+
+    expect(scrubbed.timestamp).toBe(timestamp);
+    expect(scrubbed.properties.$current_url).toBe(
+      "https://x.test/cb?code=[REDACTED]",
+    );
+  });
+
+  test("anything that is not a plain object or a list is passed through untouched", () => {
+    const pattern = /a/;
+    const list = new Map([["k", "token=abc"]]);
+
+    expect(scrubSecrets({ pattern, list })).toEqual({ pattern, list });
+    expect(scrubSecrets({ pattern }).pattern).toBe(pattern);
+  });
+
   test("an address is cut at its query or its fragment, whichever comes first", () => {
     expect(withoutQuery("https://x.test/a?b=1#c")).toBe("https://x.test/a");
     expect(withoutQuery("https://x.test/a#c")).toBe("https://x.test/a");

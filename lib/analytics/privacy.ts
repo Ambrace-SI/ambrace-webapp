@@ -39,6 +39,11 @@ const SECRET_PATTERNS: readonly [RegExp, string][] = [
 /** How deep an event is searched. Events are shallow; this only stops a loop. */
 const MAX_DEPTH = 8;
 
+function isPlainObject(value: object): boolean {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 /** Removes credentials from every piece of text in a value, however nested. */
 export function scrubSecrets<T>(value: T, depth = 0): T {
   if (typeof value === "string") {
@@ -51,6 +56,9 @@ export function scrubSecrets<T>(value: T, depth = 0): T {
     return value;
   if (Array.isArray(value))
     return value.map((item) => scrubSecrets(item, depth + 1)) as T;
+  // Only plain objects are rebuilt. Anything else (an event's timestamp is a
+  // Date) would lose what makes it what it is, and holds no text to scrub.
+  if (!isPlainObject(value)) return value;
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => [
       key,
