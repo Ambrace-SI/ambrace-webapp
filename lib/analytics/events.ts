@@ -14,7 +14,7 @@
  * student is lives on their PostHog person (`identity.ts`), not on events.
  */
 
-import { captureEvent } from "./posthog";
+import { captureEvent, readAnalyticsSettings } from "./posthog";
 
 export type SignInMethod = "google" | "password";
 
@@ -77,7 +77,25 @@ export type ProductEvents = {
   };
   /** A report was opened for a viva that ended before one was written. */
   report_empty: VivaSessionProperties;
+
+  /**
+   * The student answered one of the two questions at the end of a report.
+   * `about` says which: the viva itself, or what the examiner wrote about it.
+   * `score` is the viva's, so a rating can be read beside how it went.
+   */
+  viva_feedback_given: VivaSessionProperties & {
+    about: FeedbackSubject;
+    rating: FeedbackRating;
+    score: number;
+  };
+  /** The student closed the questions; `at` is the one they were on. */
+  viva_feedback_dismissed: VivaSessionProperties & { at: FeedbackSubject };
 };
+
+/** What a feedback question is about: the viva, or the report written on it. */
+export type FeedbackSubject = "session" | "report";
+
+export type FeedbackRating = "bad" | "fine" | "good";
 
 export type VivaSessionProperties = { viva_session_id: string };
 
@@ -97,6 +115,14 @@ export type VivaChoiceProperties = {
 };
 
 export type ProductEventName = keyof ProductEvents;
+
+/**
+ * Whether events go anywhere. For the rare screen that asks the student for
+ * something only analytics would receive: with analytics off, it must not ask.
+ */
+export function analyticsOn(): boolean {
+  return readAnalyticsSettings() !== null;
+}
 
 /** Sends one product event. Does nothing when analytics are off. */
 export function track<Name extends ProductEventName>(
