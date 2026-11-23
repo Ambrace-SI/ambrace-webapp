@@ -11,7 +11,10 @@ import { privateContentLeaks } from "./helpers/private-content";
 
 // What the screen reports to analytics, recorded here instead of sent.
 const analytics = vi.hoisted(() => ({ track: vi.fn() }));
-vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+vi.mock("@/lib/analytics/events", () => ({
+  track: analytics.track,
+  analyticsOn: () => true,
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -248,4 +251,48 @@ test("a recording of the report shows the score, and none of the examiner's note
     ]),
   ).toEqual([]);
   expect(screen.getByLabelText("Score").closest(".ph-no-capture")).toBeNull();
+});
+
+describe("asking how it went", () => {
+  test("a report ends by asking about the session, above the way on", async () => {
+    renderReport();
+    await screen.findByRole("heading", { level: 1 });
+
+    const question = screen.getByText("How was the session?");
+    const startAnother = screen.getByRole("link", {
+      name: "Start another viva",
+    });
+    expect(
+      question.compareDocumentPosition(startAnother) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  test("an answer is sent with this viva's ID and its score", async () => {
+    renderReport();
+    await screen.findByRole("heading", { level: 1 });
+    analytics.track.mockClear();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Good" }));
+
+    expect(analytics.track.mock.calls).toEqual([
+      [
+        "viva_feedback_given",
+        {
+          viva_session_id: "session-1",
+          about: "session",
+          rating: "good",
+          score: 7,
+        },
+      ],
+    ]);
+  });
+
+  test("a viva with no report is not asked about", async () => {
+    getVivaSession.mockResolvedValue({ ...SESSION, feedback: null });
+    renderReport();
+    await screen.findByText("There's no report for this viva");
+
+    expect(screen.queryByText("How was the session?")).toBeNull();
+  });
 });

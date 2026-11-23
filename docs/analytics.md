@@ -46,6 +46,18 @@ Screens call `track(...)` from `events.ts`, and mark private content with
   carries its `viva_session_id`.
 - **Screen recordings,** with private content hidden (below).
 
+## Asking the student
+
+The report ends with two one-tap questions: "How was the session?" and, once
+that is answered, "How is the report?" (Bad, Fine, Good). Each answer is a
+`viva_feedback_given` event with the viva's ID, which question it answers
+(`about`), the `rating` and the viva's `score`. Closing the row sends
+`viva_feedback_dismissed`.
+
+Nothing is stored, on our side or in the browser. So the row is not shown when
+analytics is off, and opening a report again asks again. Where one viva has
+more than one answer to a question, take the latest by time.
+
 ## What never leaves the browser
 
 - **What a student says.** The captions and the examiner's written notes are

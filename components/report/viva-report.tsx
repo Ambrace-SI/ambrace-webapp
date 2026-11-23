@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
+import { VivaFeedbackPrompt } from "@/components/report/viva-feedback-prompt";
 import { Button } from "@/components/ui/button";
 import { track } from "@/lib/analytics/events";
 import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
@@ -137,6 +138,13 @@ export function VivaReport() {
           }
         />
       ) : null}
+
+      {/* After everything there is to read, and before the way on. */}
+      <VivaFeedbackPrompt
+        key={session.viva_session_id}
+        vivaSessionId={session.viva_session_id}
+        score={feedback.score}
+      />
 
       <div className="flex flex-col gap-3 border-t border-border pt-8 sm:flex-row">
         <StartAnother />
