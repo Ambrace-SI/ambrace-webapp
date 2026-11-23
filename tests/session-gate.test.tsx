@@ -8,6 +8,18 @@ import { SessionGate } from "@/components/app/session-gate";
 import type { Me } from "@/types/profile";
 
 const router = { replace: vi.fn() };
+// Who the events belong to, recorded here instead of sent.
+const identity = vi.hoisted(() => ({
+  identifyStudent: vi.fn(),
+  forgetStudent: vi.fn(),
+}));
+vi.mock("@/lib/analytics/identity", () => identity);
+
+const getSignInAccount = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auth/account", () => ({
+  getSignInAccount: () => getSignInAccount(),
+}));
+
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const signOut = vi.fn();
@@ -75,6 +87,8 @@ beforeEach(() => {
   getMe.mockReset();
   getAccessToken.mockReset();
   getAccessToken.mockResolvedValue("token");
+  getSignInAccount.mockReset();
+  getSignInAccount.mockResolvedValue({ email: null, method: "password" });
   signOut.mockReset();
   signOut.mockResolvedValue(undefined);
   replaceLocation.mockReset();
@@ -203,4 +217,69 @@ test("someone with no session is not told the backend is unreachable", async () 
 
   await waitFor(() => expect(replaceLocation).toHaveBeenCalledWith("/sign-in"));
   expect(screen.queryByText(/Your account is fine/)).toBeNull();
+});
+
+function accountWith(email: string | null) {
+  getSignInAccount.mockResolvedValue({ email, method: "password" });
+}
+
+test("what analytics is told: who is signed in, once, with the email from their sign-in account", async () => {
+  identity.identifyStudent.mockClear();
+  accountWith("asha@example.com");
+  getMe.mockResolvedValue(ONBOARDED);
+
+  renderGate("profile");
+
+  await waitFor(() => expect(identity.identifyStudent).toHaveBeenCalled());
+  expect(identity.identifyStudent.mock.calls).toEqual([
+    [ONBOARDED, "asha@example.com"],
+  ]);
+});
+
+test("what analytics is told: who is signed in, even when the email cannot be read", async () => {
+  identity.identifyStudent.mockClear();
+  getSignInAccount.mockRejectedValue(new Error("Nobody is signed in."));
+  getMe.mockResolvedValue(ONBOARDED);
+
+  renderGate("profile");
+
+  await waitFor(() =>
+    expect(identity.identifyStudent).toHaveBeenCalledWith(ONBOARDED, null),
+  );
+});
+
+test("what analytics is told: a student still onboarding is known too", async () => {
+  identity.identifyStudent.mockClear();
+  accountWith("asha@example.com");
+  getMe.mockResolvedValue(NEW_STUDENT);
+
+  renderGate("session");
+
+  await waitFor(() =>
+    expect(identity.identifyStudent).toHaveBeenCalledWith(
+      NEW_STUDENT,
+      "asha@example.com",
+    ),
+  );
+});
+
+test("what analytics is told: nobody, while the profile is still loading", () => {
+  identity.identifyStudent.mockClear();
+  accountWith("asha@example.com");
+  getMe.mockReturnValue(new Promise(() => undefined));
+
+  renderGate("profile");
+
+  expect(identity.identifyStudent).not.toHaveBeenCalled();
+});
+
+test("what analytics is told: a session the backend refuses is forgotten on this device", async () => {
+  identity.forgetStudent.mockClear();
+  accountWith("asha@example.com");
+  getMe.mockRejectedValue(failure(401));
+
+  renderGate("profile");
+
+  await waitFor(() => expect(signOut).toHaveBeenCalled());
+  expect(identity.forgetStudent).toHaveBeenCalledTimes(1);
 });

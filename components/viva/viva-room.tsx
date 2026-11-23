@@ -11,6 +11,10 @@ import {
 
 import { LiveSession, type VivaScope } from "@/components/viva/live-session";
 import { VivaSetup, type VivaChoice } from "@/components/viva/viva-setup";
+import type { VivaChoiceProperties } from "@/lib/analytics/events";
+import { track } from "@/lib/analytics/events";
+import { trackViva, type VivaTracking } from "@/lib/analytics/viva";
+import { httpStatus } from "@/lib/api/errors";
 import { abandonViva, startVivaSession } from "@/lib/api/axios";
 import { useWholeScreen } from "@/lib/app/whole-screen";
 import { mapVivaRequest } from "@/lib/curriculum/selection";
@@ -19,7 +23,7 @@ import { useMe } from "@/lib/hooks/use-me";
 import { useVivaSession } from "@/lib/hooks/useVivaSession";
 import { useVivaStore } from "@/lib/store/viva-store";
 import { describeStartError } from "@/lib/viva/start-error";
-import { SessionState } from "@/types/viva";
+import { SessionState, type VivaStartResponse } from "@/types/viva";
 
 /** A viva the server still believes is running. */
 const IN_FLIGHT: ReadonlySet<SessionState> = new Set([
@@ -74,6 +78,14 @@ export function VivaRoom() {
   // Whether the engine has begun the viva on screen. Until it has, an idle
   // engine is just one that has not started yet.
   const engineBegan = useRef(false);
+  // The viva in the room, as analytics follows it. None while choosing.
+  const tracking = useRef<VivaTracking | null>(null);
+
+  /** Told before the viva's state is cleared, so its ending can still be read. */
+  function leaveViva() {
+    tracking.current?.leave();
+    tracking.current = null;
+  }
 
   useWholeScreen(scope !== null);
 
@@ -85,6 +97,7 @@ export function VivaRoom() {
   function backToWelcome({ keepReason }: { keepReason: boolean }) {
     engineBegan.current = false;
     const { error } = useVivaStore.getState();
+    leaveViva();
     session.resetSession();
     if (keepReason && error) useVivaStore.getState().setError(error);
     setScope(null);
@@ -121,6 +134,7 @@ export function VivaRoom() {
       // A viva still running has nobody in the room: release it on the server.
       if (sessionId && !conclusionData && IN_FLIGHT.has(sessionState))
         releaseViva(queryClient, sessionId);
+      leaveViva();
       useVivaStore.getState().resetSession();
       // When the engine itself sent the student home, the reason goes with them.
       if (error && sessionState === SessionState.IDLE)
@@ -138,32 +152,59 @@ export function VivaRoom() {
 
   async function start({ selection, voiceName }: VivaChoice) {
     const thisVisit = visit.current;
+    const stillHere = () => visit.current === thisVisit;
+    const chapter = selection.chapters[0];
+    const choice: VivaChoiceProperties = {
+      class_level: selection.class_level,
+      subject_id: selection.subject_id,
+      subject: selection.subject_name,
+      chapter_id: chapter.id,
+      chapter: chapter.name,
+      topic_count: chapter.topics.length,
+      voice: voiceName,
+    };
     setStartError(null);
     setStarting(true);
+    track("viva_requested", choice);
+
+    // First the viva is created. If that fails, there never was one.
+    let response: VivaStartResponse;
     try {
       // Nothing from an earlier viva may leak into this one.
       session.resetSession();
-      const response = await startVivaSession(
+      response = await startVivaSession(
         // Name and class come from the profile, never from the form.
         mapVivaRequest(profile!.name, voiceName, selection),
       );
-      if (visit.current !== thisVisit) {
-        // The student left while the session was being created.
-        releaseViva(queryClient, response.viva_session_id);
-        return;
-      }
-      session.setSessionData(response);
-      setScope({
-        subject: selection.subject_name,
-        chapter: selection.chapters[0].name,
+    } catch (error) {
+      track("viva_start_failed", {
+        ...choice,
+        status: httpStatus(error) ?? null,
       });
+      if (stillHere()) {
+        setStartError(describeStartError(error));
+        setStarting(false);
+      }
+      return;
+    }
+    if (!stillHere()) {
+      // The student left while the session was being created.
+      releaseViva(queryClient, response.viva_session_id);
+      return;
+    }
+
+    // Then the room opens. From here a failure is the viva's own.
+    try {
+      tracking.current = trackViva(response.viva_session_id, choice);
+      session.setSessionData(response);
+      setScope({ subject: selection.subject_name, chapter: chapter.name });
       // Asks for the microphone, then connects. Its own failures are shown
       // on the live screen, where the student now is.
       await session.initializeSession();
     } catch (error) {
-      if (visit.current === thisVisit) setStartError(describeStartError(error));
+      if (stillHere()) setStartError(describeStartError(error));
     } finally {
-      if (visit.current === thisVisit) setStarting(false);
+      if (stillHere()) setStarting(false);
     }
   }
 
@@ -173,6 +214,7 @@ export function VivaRoom() {
         session={session}
         scope={scope}
         onChooseAgain={() => backToWelcome({ keepReason: false })}
+        onMicrophoneUnheard={() => tracking.current?.microphoneUnheard()}
       />
     );
   }

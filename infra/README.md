@@ -100,13 +100,29 @@ set it to `true` in `prod.tfvars` and `APPLY`.
 When the browser needs to talk to a new origin, add it to `connect_sources` in
 the var file.
 
-## Telemetry (PostHog)
+## Analytics (PostHog)
 
-Off until a key is set. To turn it on for an environment, create the String
-parameter `/ambrace/<env>/web/posthog_key` in SSM (a PostHog project key is
-public) and `PUBLISH`. `/ambrace/<env>/web/posthog_host` is optional and
-defaults to `https://us.i.posthog.com`, which is already in `connect_sources`;
-a different host must be added there too.
+Off until a key is set. The backend deployment (`ambrace-backend`,
+`infra/app/web_settings.tf`) creates `/ambrace/<env>/web/posthog_key` with a
+placeholder and `/ambrace/<env>/web/posthog_host` with PostHog's US address,
+and never overwrites either afterwards. The app treats anything that does not
+start with `phc_` as "no key", so a placeholder leaves analytics off.
+
+To turn analytics on for an environment:
+
+1. In the PostHog project, switch on "Record user sessions" (session replay
+   needs it on both sides).
+2. Replace the value of `/ambrace/<env>/web/posthog_key` in SSM with the
+   project key (`phc_...`). It is public: it ships in the JavaScript.
+3. `PUBLISH`.
+
+The browser talks to two PostHog addresses, both in `connect_sources`:
+`us.i.posthog.com` for events and recordings, `us-assets.i.posthog.com` for the
+project's settings. If `posthog_host` is changed, change `connect_sources` to
+match, or the browser will block every event. No script is loaded from
+PostHog: the recorder is bundled into the app.
+
+What is sent, and what never is: `docs/analytics.md`.
 
 ## Try it without AWS
 

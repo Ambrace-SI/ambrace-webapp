@@ -27,6 +27,26 @@ const SELECTION: CurriculumSelection = {
   chapters: [{ id: "cell", name: "Cell", topics: [] }],
 };
 
+// What the room reports to analytics, recorded here instead of sent. The
+// following of one viva is tested on its own (analytics-viva.test.ts); here
+// it is a stand-in, and what is checked is when the room starts and ends it.
+const analytics = vi.hoisted(() => ({
+  track: vi.fn(),
+  trackViva: vi.fn(),
+  leave: vi.fn(),
+  microphoneUnheard: vi.fn(),
+}));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+vi.mock("@/lib/analytics/viva", () => ({
+  trackViva: (...given: unknown[]) => {
+    analytics.trackViva(...given);
+    return {
+      leave: analytics.leave,
+      microphoneUnheard: analytics.microphoneUnheard,
+    };
+  },
+}));
+
 vi.mock("@/components/viva/viva-setup", () => ({
   VivaSetup: (props: {
     profile: { name: string };
@@ -52,12 +72,14 @@ vi.mock("@/components/viva/live-session", () => ({
   LiveSession: (props: {
     scope: { subject: string; chapter: string };
     onChooseAgain: () => void;
+    onMicrophoneUnheard: () => void;
   }) => (
     <div>
       <p>
         live: {props.scope.subject} / {props.scope.chapter}
       </p>
       <button onClick={props.onChooseAgain}>choose again</button>
+      <button onClick={props.onMicrophoneUnheard}>microphone unheard</button>
     </div>
   ),
 }));
@@ -501,5 +523,146 @@ describe("leaving the page", () => {
     await act(async () => fail(new APIError("down", 500)));
 
     expect(abandonViva).not.toHaveBeenCalled();
+  });
+});
+
+describe("what analytics is told", () => {
+  const CHOICE = {
+    class_level: 9,
+    subject_id: "science",
+    subject: "Science",
+    chapter_id: "cell",
+    chapter: "Cell",
+    topic_count: 0,
+    voice: "Puck",
+  };
+
+  beforeEach(() => {
+    for (const mock of Object.values(analytics)) mock.mockClear();
+  });
+
+  test("what was asked for, then the viva is followed, with nothing that names the student", async () => {
+    renderRoom();
+
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    expect(analytics.track.mock.calls).toEqual([["viva_requested", CHOICE]]);
+    expect(analytics.trackViva.mock.calls).toEqual([["session-1", CHOICE]]);
+    expect(
+      JSON.stringify([
+        analytics.track.mock.calls,
+        analytics.trackViva.mock.calls,
+      ]),
+    ).not.toMatch(/Asha/);
+  });
+
+  test("a refused start is counted with the server's status, and no viva is followed", async () => {
+    startVivaSession.mockRejectedValue(new APIError("Too many requests", 429));
+    renderRoom();
+
+    await pressStart();
+    await screen.findByRole("alert");
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["viva_requested", CHOICE],
+      ["viva_start_failed", { ...CHOICE, status: 429 }],
+    ]);
+    expect(analytics.trackViva).not.toHaveBeenCalled();
+  });
+
+  test("a start that never reached the server has no status to give", async () => {
+    startVivaSession.mockRejectedValue(new Error("offline"));
+    renderRoom();
+
+    await pressStart();
+    await screen.findByRole("alert");
+
+    expect(analytics.track.mock.calls[1]).toEqual([
+      "viva_start_failed",
+      { ...CHOICE, status: null },
+    ]);
+  });
+
+  test("a fault after the room opened belongs to the viva, not to the start", async () => {
+    engine.initializeSession.mockRejectedValueOnce(new Error("no microphone"));
+    renderRoom();
+
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    expect(analytics.trackViva).toHaveBeenCalledTimes(1);
+    expect(analytics.track.mock.calls).toEqual([["viva_requested", CHOICE]]);
+  });
+
+  test("a viva created after the student had left is released, and never followed", async () => {
+    let answer: (response: unknown) => void = () => undefined;
+    startVivaSession.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const view = renderRoom();
+    await pressStart();
+
+    view.unmount();
+    await act(async () => answer({ viva_session_id: "session-1" }));
+
+    expect(abandonViva).toHaveBeenCalledWith("session-1");
+    expect(analytics.trackViva).not.toHaveBeenCalled();
+  });
+
+  test("an unheard microphone is passed on to the viva being followed", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "microphone unheard" }));
+
+    expect(analytics.microphoneUnheard).toHaveBeenCalledTimes(1);
+  });
+
+  test("stepping back to the welcome leaves the viva, before its state is cleared", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+    act(() => useVivaStore.setState({ sessionState: SessionState.COMPLETED }));
+    let stateWhenLeft: SessionState | null = null;
+    analytics.leave.mockImplementation(() => {
+      stateWhenLeft = useVivaStore.getState().sessionState;
+    });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "choose again" }));
+
+    expect(analytics.leave).toHaveBeenCalledTimes(1);
+    expect(stateWhenLeft).toBe(SessionState.COMPLETED);
+  });
+
+  test("walking away from the page mid-viva leaves it, exactly once", async () => {
+    const view = renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+    act(() =>
+      useVivaStore.setState({
+        sessionId: "session-1",
+        sessionState: SessionState.ACTIVE,
+      }),
+    );
+
+    view.unmount();
+
+    expect(analytics.leave).toHaveBeenCalledTimes(1);
+  });
+
+  test("nothing is left when no viva was ever started", () => {
+    const view = renderRoom();
+
+    view.unmount();
+
+    expect(analytics.leave).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import {
   SettingValue,
 } from "@/components/settings/setting-rows";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { leaveAmbrace } from "@/lib/app/sign-out";
 import type { SignInAccount } from "@/lib/auth/account";
 import { useSignInAccount } from "@/lib/hooks/use-sign-in-account";
@@ -36,9 +37,11 @@ export function AccountSettings() {
             account.isPending ? (
               <Skeleton className="h-4 w-40" />
             ) : (
-              <SettingValue empty="Not available">
-                {account.data?.email}
-              </SettingValue>
+              <span className={PRIVATE_CLASS}>
+                <SettingValue empty="Not available">
+                  {account.data?.email}
+                </SettingValue>
+              </span>
             )
           }
         />

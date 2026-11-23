@@ -17,6 +17,7 @@ import {
 import { settingsWindow } from "@/lib/settings/settings-window";
 import { themePreference } from "@/lib/theme/theme-preference";
 import type { Me, ProfileUpdate } from "@/types/profile";
+import { privateContentLeaks } from "./helpers/private-content";
 
 /**
  * Settings, used the way a student uses it: the real window, real rows and
@@ -920,5 +921,28 @@ describe("changing the password", () => {
 
     expect(screen.queryByLabelText("Current password")).toBeNull();
     expect(account.changePassword).not.toHaveBeenCalled();
+  });
+});
+
+describe("what a recording of Settings must not show", () => {
+  test("the student's name and school, on Profile", async () => {
+    renderSettings("profile", {
+      ...ME,
+      profile: { ...ME.profile!, school_name: "Hill View School" },
+    });
+
+    await screen.findByText("Asha Rao");
+    expect(privateContentLeaks(document.body, ["Asha", "Hill View"])).toEqual(
+      [],
+    );
+  });
+
+  test("the email the account belongs to, on Account", async () => {
+    renderSettings("account");
+
+    await screen.findByText("asha@example.com");
+    expect(privateContentLeaks(document.body, ["asha@example.com"])).toEqual(
+      [],
+    );
   });
 });

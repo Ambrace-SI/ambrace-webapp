@@ -12,6 +12,7 @@ import {
   SettingsGroup,
   SettingValue,
 } from "@/components/settings/setting-rows";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { isSignedOutError } from "@/lib/api/errors";
 import { useSaveProfile } from "@/lib/hooks/use-me";
 import {
@@ -194,7 +195,12 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
               key={detail.key}
               label={detail.label}
               description={open ? detail.whileEditing : detail.description}
-              value={<SettingValue>{shown}</SettingValue>}
+              value={
+                // Name and school say who the student is.
+                <span className={PRIVATE_CLASS}>
+                  <SettingValue>{shown}</SettingValue>
+                </span>
+              }
               action={
                 <RowButton
                   data-detail={detail.key}

@@ -6,10 +6,12 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Orbit } from "@/components/brand/orbit";
 import { Button } from "@/components/ui/button";
+import { forgetStudent, identifyStudent } from "@/lib/analytics/identity";
 import { isSignedOutError } from "@/lib/api/errors";
 import { configureAuth, getAccessToken } from "@/lib/auth/client";
 import { ONBOARDING_PATH, signInUrlFor } from "@/lib/auth/routes";
 import { useMe } from "@/lib/hooks/use-me";
+import { useSignInAccount } from "@/lib/hooks/use-sign-in-account";
 
 /**
  * Decides which signed-in screen a student belongs on.
@@ -36,6 +38,10 @@ export function SessionGate({
 }) {
   const router = useRouter();
   const { data: me, error, refetch, isRefetching } = useMe();
+  const account = useSignInAccount();
+  const email = account.data?.email ?? null;
+  // Read from this device, so it settles at once, with or without an email.
+  const emailSettled = !account.isPending;
 
   const [noSession, setNoSession] = useState(false);
 
@@ -63,11 +69,19 @@ export function SessionGate({
       window.location.replace(signInUrlFor(pathname, search));
     // With no session there is nothing to clear.
     if (noSession) return toSignIn();
+    forgetStudent();
     configureAuth();
     void signOut()
       .catch(() => undefined)
       .finally(toSignIn);
   }, [signedOut, noSession]);
+
+  // Every signed-in screen is inside this gate, so this is the one place the
+  // student's events are tied to their account. Runs again when the profile
+  // changes, so a new class or board is known straight away.
+  useEffect(() => {
+    if (me && emailSettled) identifyStudent(me, email);
+  }, [me, email, emailSettled]);
 
   useEffect(() => {
     if (misplaced) router.replace(ONBOARDING_PATH);

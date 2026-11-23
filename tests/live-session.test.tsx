@@ -17,6 +17,7 @@ import {
   PlaybackState,
   SessionState,
 } from "@/types/viva";
+import { privateContentLeaks } from "./helpers/private-content";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -57,6 +58,7 @@ type Session = ReturnType<typeof useVivaSession>;
 const requestConclusion = vi.fn(async () => undefined);
 const toggleMute = vi.fn();
 const onChooseAgain = vi.fn();
+const onMicrophoneUnheard = vi.fn();
 
 /** A viva in full flow, as the hook would hand it to the screen. */
 function session(changes: Partial<Session> = {}): Session {
@@ -83,6 +85,7 @@ function renderLive(changes: Partial<Session> = {}) {
         session={session(changes)}
         scope={{ subject: "Science", chapter: "Cell" }}
         onChooseAgain={onChooseAgain}
+        onMicrophoneUnheard={onMicrophoneUnheard}
       />
     </QueryClientProvider>,
   );
@@ -105,6 +108,7 @@ beforeEach(() => {
   requestConclusion.mockClear();
   toggleMute.mockClear();
   onChooseAgain.mockClear();
+  onMicrophoneUnheard.mockClear();
   useVivaStore.getState().resetSession();
   microphone.rmsDbfs = -30;
   vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -534,5 +538,59 @@ describe("the clock", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a microphone that goes unheard", () => {
+  test("is reported to whoever is following the viva", () => {
+    vi.useFakeTimers();
+    microphone.rmsDbfs = -120;
+    renderLive();
+    expect(onMicrophoneUnheard).not.toHaveBeenCalled();
+
+    act(() => void vi.advanceTimersByTime((UNHEARD_AFTER_SECONDS + 1) * 1000));
+
+    expect(onMicrophoneUnheard).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  test("is not reported while it is the examiner's turn", () => {
+    vi.useFakeTimers();
+    microphone.rmsDbfs = -120;
+    renderLive({ playbackState: PlaybackState.PLAYING });
+
+    act(() => void vi.advanceTimersByTime((UNHEARD_AFTER_SECONDS + 1) * 1000));
+
+    expect(onMicrophoneUnheard).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
+
+describe("what a recording of the viva must not show", () => {
+  test("the captions: what the student and the examiner said", () => {
+    renderLive({
+      transcripts: [
+        line("1", "assistant", "What does the nucleus do?"),
+        line("2", "user", "The nucleus controls the cell."),
+      ],
+    });
+
+    expect(
+      privateContentLeaks(document.body, [
+        "What does the nucleus do?",
+        "The nucleus controls the cell.",
+      ]),
+    ).toEqual([]);
+  });
+
+  test("the examiner's closing words about the student, while the score stays visible", () => {
+    renderLive({
+      sessionState: SessionState.COMPLETED,
+      conclusionData: { score: 7, total: 10, feedback: "Clear on cells." },
+    });
+
+    expect(privateContentLeaks(document.body, ["Clear on cells."])).toEqual([]);
+    // The score is what the recording is for.
+    expect(privateContentLeaks(document.body, ["7"])).not.toEqual([]);
   });
 });

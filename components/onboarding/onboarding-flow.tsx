@@ -3,7 +3,7 @@
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { ArrowLeftIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { Orbit } from "@/components/brand/orbit";
@@ -15,6 +15,8 @@ import {
   TextField,
 } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics/events";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { isSignedOutError } from "@/lib/api/errors";
 import { configureAuth } from "@/lib/auth/client";
 import { HOME_PATH } from "@/lib/auth/routes";
@@ -90,6 +92,8 @@ function OnboardingSteps({
   // Decided once, on arrival. Saving the first step completes onboarding, and
   // that must not throw the student out before the optional step.
   const [arrivedOnboarded] = useState(onboardedNow);
+  // Step one can be saved again after going back. Onboarding completes once.
+  const completionCounted = useRef(onboardedNow);
 
   const [step, setStep] = useState<Step>("basics");
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
@@ -124,11 +128,13 @@ function OnboardingSteps({
     setDraft((current) => ({ ...current, ...changes }));
   }
 
-  async function send(includeOptional: boolean): Promise<boolean> {
+  /** Saves the draft. Returns what was saved, or null if it could not be. */
+  async function send(includeOptional: boolean) {
     setFormError(undefined);
+    const update = toProfileUpdate(draft, { includeOptional });
     try {
-      await save.mutateAsync(toProfileUpdate(draft, { includeOptional }));
-      return true;
+      await save.mutateAsync(update);
+      return update;
     } catch (error) {
       if (isSignedOutError(error)) {
         setFormError(
@@ -137,7 +143,7 @@ function OnboardingSteps({
       } else {
         setFormError(SAVE_FAILED);
       }
-      return false;
+      return null;
     }
   }
 
@@ -147,7 +153,13 @@ function OnboardingSteps({
     setErrors(problems);
     setNameTouched(true);
     if (hasErrors(problems)) return;
-    if (await send(false)) setStep("extras");
+    const saved = await send(false);
+    if (!saved) return;
+    if (!completionCounted.current) {
+      completionCounted.current = true;
+      track("onboarding_completed", { class_level: saved.class_level });
+    }
+    setStep("extras");
   }
 
   async function submitExtras(event: FormEvent<HTMLFormElement>) {
@@ -155,7 +167,13 @@ function OnboardingSteps({
     const problems = validateOptional(draft);
     setErrors(problems);
     if (hasErrors(problems)) return;
-    if (await send(true)) router.replace(HOME_PATH);
+    const saved = await send(true);
+    if (!saved) return;
+    track("onboarding_extras_saved", {
+      board: saved.board ?? null,
+      has_school: Boolean(saved.school_name),
+    });
+    router.replace(HOME_PATH);
   }
 
   if (arrivedOnboarded) {
@@ -250,9 +268,12 @@ function OnboardingSteps({
                   A little more, if you like
                 </h1>
                 <p className="text-muted-foreground">
-                  You&apos;re all set, {draft.name.trim().split(/\s+/)[0]}.
-                  These help us match questions to your syllabus. Skip them now
-                  and add them whenever you want.
+                  You&apos;re all set,{" "}
+                  <span className={PRIVATE_CLASS}>
+                    {draft.name.trim().split(/\s+/)[0]}
+                  </span>
+                  . These help us match questions to your syllabus. Skip them
+                  now and add them whenever you want.
                 </p>
               </div>
 

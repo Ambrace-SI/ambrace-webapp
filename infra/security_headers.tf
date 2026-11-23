@@ -24,6 +24,8 @@ locals {
     "font-src 'self'",
     # The voice engine plays and records through blob-backed audio worklets.
     "media-src 'self' blob:",
+    # The same goes for the analytics recorder, which compresses in a worker
+    # it starts from a blob of its own bundled code.
     "worker-src 'self' blob:",
     "connect-src 'self' ${join(" ", var.connect_sources)}",
   ])

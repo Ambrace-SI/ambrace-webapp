@@ -21,6 +21,7 @@ import {
   SidebarMenuLabel,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { leaveAmbrace } from "@/lib/app/sign-out";
 import { useMe } from "@/lib/hooks/use-me";
 import { settingsWindow } from "@/lib/settings/settings-window";
@@ -56,7 +57,9 @@ export function AccountMenu() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               aria-label={`Account menu for ${name}`}
-              className="aria-expanded:bg-sidebar-accent"
+              // The whole button: its label names the student, and so does
+              // what is written on it.
+              className={`aria-expanded:bg-sidebar-accent ${PRIVATE_CLASS}`}
             >
               <span
                 aria-hidden="true"

@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { AuthHeading } from "@/components/auth/auth-shell";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics/events";
 import { configureAuth } from "@/lib/auth/client";
 import { takeReturnPath } from "@/lib/auth/handoff";
 import { SIGN_IN_PATH } from "@/lib/auth/routes";
@@ -29,11 +30,13 @@ export function AuthCallback() {
     const enterApp = () => {
       if (finished) return;
       finished = true;
+      track("signed_in", { method: "google" });
       window.location.replace(takeReturnPath());
     };
     const fail = () => {
       if (finished) return;
       finished = true;
+      track("sign_in_failed", { method: "google", reason: "RedirectFailed" });
       setFailed(true);
     };
 

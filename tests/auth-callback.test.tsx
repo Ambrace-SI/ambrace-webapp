@@ -4,6 +4,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { AuthCallback } from "@/components/auth/auth-callback";
 
+// What the screen reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+
 vi.mock("aws-amplify/auth/enable-oauth-listener", () => ({}));
 vi.mock("next/link", () => ({
   default: ({
@@ -142,4 +146,27 @@ test("leaving the page stops listening", () => {
   unmount();
 
   expect(stopListening).toHaveBeenCalled();
+});
+
+test("what analytics is told: a finished Google sign-in, once", () => {
+  analytics.track.mockClear();
+  render(<AuthCallback />);
+
+  announce("signInWithRedirect");
+  announce("signInWithRedirect");
+
+  expect(analytics.track.mock.calls).toEqual([
+    ["signed_in", { method: "google" }],
+  ]);
+});
+
+test("what analytics is told: a Google sign-in that did not finish", () => {
+  analytics.track.mockClear();
+  render(<AuthCallback />);
+
+  announce("signInWithRedirect_failure");
+
+  expect(analytics.track.mock.calls).toEqual([
+    ["sign_in_failed", { method: "google", reason: "RedirectFailed" }],
+  ]);
 });

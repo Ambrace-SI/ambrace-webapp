@@ -22,6 +22,8 @@ import {
   TextField,
 } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics/events";
+import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { configureAuth } from "@/lib/auth/client";
 import { describeAuthError } from "@/lib/auth/errors";
 import {
@@ -71,6 +73,7 @@ export function SignUpForm() {
     try {
       configureAuth();
       rememberReturnPath(HOME_PATH);
+      track("google_sign_in_started", { from: "sign_up" });
       await signInWithRedirect({ provider: "Google" });
     } catch (error) {
       const problem = describeAuthError(error);
@@ -103,6 +106,7 @@ export function SignUpForm() {
         password,
         options: { userAttributes: { email: address }, autoSignIn: true },
       });
+      track("account_created", { method: "password" });
       resend.start();
       setStep("confirm");
     } catch (error) {
@@ -127,9 +131,13 @@ export function SignUpForm() {
         confirmationCode: submitted,
       });
       clearPendingEmail();
+      track("email_confirmed");
       try {
         const result = await autoSignIn();
-        if (result.isSignedIn) return enterApp();
+        if (result.isSignedIn) {
+          track("signed_in", { method: "password" });
+          return enterApp();
+        }
       } catch {
         // Confirmed, but the automatic sign-in was not available (for example
         // when the account was created in an earlier visit).
@@ -165,8 +173,10 @@ export function SignUpForm() {
           description={
             <>
               We sent a {CODE_LENGTH}-digit code to{" "}
-              <span className="text-foreground">{email}</span>. It can take a
-              minute to arrive.
+              <span className={`text-foreground ${PRIVATE_CLASS}`}>
+                {email}
+              </span>
+              . It can take a minute to arrive.
             </>
           }
         />

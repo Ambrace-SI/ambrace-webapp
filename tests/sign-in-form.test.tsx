@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { SignInForm } from "@/components/auth/sign-in-form";
 
 const router = { push: vi.fn(), replace: vi.fn() };
 let query = "";
+// What the screen reports to analytics, recorded here instead of sent.
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/analytics/events", () => ({ track: analytics.track }));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(query),
@@ -237,4 +241,61 @@ test("the links lead to sign-up and password reset", () => {
       .getByRole("link", { name: "Forgot your password?" })
       .getAttribute("href"),
   ).toBe("/reset-password");
+});
+
+describe("what analytics is told", () => {
+  beforeEach(() => analytics.track.mockClear());
+
+  test("a password sign-in is counted", async () => {
+    signIn.mockResolvedValue({
+      isSignedIn: true,
+      nextStep: { signInStep: "DONE" },
+    });
+    render(<SignInForm />);
+
+    await fillAndSubmit("asha@example.com", "Secret123");
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["signed_in", { method: "password" }],
+    ]);
+  });
+
+  test("a refused sign-in is counted by its name, never by the email or message", async () => {
+    signIn.mockRejectedValue({
+      name: "NotAuthorizedException",
+      message: "Incorrect username or password for asha@example.com",
+    });
+    render(<SignInForm />);
+
+    await fillAndSubmit("asha@example.com", "wrong");
+    await screen.findByRole("alert");
+
+    expect(analytics.track.mock.calls).toEqual([
+      [
+        "sign_in_failed",
+        { method: "password", reason: "NotAuthorizedException" },
+      ],
+    ]);
+  });
+
+  test("leaving for Google is counted before the browser goes", async () => {
+    signInWithRedirect.mockReturnValue(new Promise(() => undefined));
+    render(<SignInForm />);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: /Continue with Google/ }));
+
+    expect(analytics.track.mock.calls).toEqual([
+      ["google_sign_in_started", { from: "sign_in" }],
+    ]);
+  });
+
+  test("a slip caught on the form is not a failed sign-in", async () => {
+    render(<SignInForm />);
+
+    await fillAndSubmit("asha", "");
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
 });
