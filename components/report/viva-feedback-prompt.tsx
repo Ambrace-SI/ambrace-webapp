@@ -14,7 +14,7 @@ import {
 /** The two things asked about, in the order they are asked. */
 const QUESTIONS: Record<FeedbackSubject, string> = {
   session: "How was the session?",
-  report: "How is this report?",
+  report: "How is the report?",
 };
 
 const RATINGS: readonly { rating: FeedbackRating; label: string }[] = [
