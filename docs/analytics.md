@@ -37,7 +37,8 @@ Screens call `track(...)` from `events.ts`, and mark private content with
 
 - **The person:** the Cognito account ID, name, email, class, board and school
   name. Set after sign-in, forgotten on this device at sign-out. Deleting the
-  person in PostHog removes them.
+  person in PostHog removes them. PostHog is told only on the first sign-in on
+  a browser and when a detail changes, not on every page load.
 - **Events:** the product events in `events.ts`, the engine's `voice_*`
   events, page views, clicks and errors. No event carries a name, email,
   school, transcript, audio, error message or credential; `cleanProperties`
