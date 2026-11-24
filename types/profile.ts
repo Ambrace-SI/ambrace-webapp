@@ -17,9 +17,46 @@ export const CLASS_LEVELS = Array.from(
   (_, index) => MIN_CLASS_LEVEL + index,
 );
 
+/**
+ * Who the person is, as onboarding asks it. Fixed once saved.
+ *
+ * Teachers and parents have exactly the same powers: both are "educators"
+ * and see the app's teaching side. The difference only changes wording.
+ */
+export type AccountType = "student" | "teacher" | "parent";
+export type EducatorType = Exclude<AccountType, "student">;
+/** Which side of the app a person belongs on. */
+export type Side = "student" | "educator";
+
+export function isEducator(type: AccountType): type is EducatorType {
+  return type !== "student";
+}
+
+export const sideOf = (type: AccountType): Side =>
+  isEducator(type) ? "educator" : "student";
+
+export const ACCOUNT_TYPES: readonly AccountType[] = [
+  "student",
+  "teacher",
+  "parent",
+];
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  student: "Student",
+  teacher: "Teacher",
+  parent: "Parent",
+};
+
+export const EDUCATOR_LABELS: Record<EducatorType, string> = {
+  teacher: "Teacher",
+  parent: "Parent",
+};
+
 export type Profile = {
   name: string;
-  class_level: number;
+  account_type: AccountType;
+  /** A student's class. Teachers and parents have none: it is per group. */
+  class_level: number | null;
   board: Board | null;
   school_name: string | null;
   school_address: string | null;
@@ -27,10 +64,15 @@ export type Profile = {
   updated_at: string;
 };
 
-/** What the student can set. Only the name and the class are required. */
+/**
+ * What a person can set. A student needs a name and a class; a teacher or
+ * parent only a name. The type can be changed later, within the rules the
+ * server enforces (see Settings → Profile).
+ */
 export type ProfileUpdate = {
   name: string;
-  class_level: number;
+  account_type: AccountType;
+  class_level?: number | null;
   board?: Board | null;
   school_name?: string | null;
   school_address?: string | null;

@@ -93,6 +93,7 @@ const ME: Me = {
   onboarding_complete: true,
   profile: {
     name: "Asha Rao",
+    account_type: "student",
     class_level: 9,
     board: "CBSE",
     school_name: null,
@@ -275,6 +276,25 @@ describe("the page the student is on", () => {
 
     expect(newViva().getAttribute("aria-current")).toBeNull();
     expect(newViva().getAttribute("data-active")).toBe("false");
+  });
+});
+
+describe("the student's groups", () => {
+  const groups = () => screen.getByRole("link", { name: "Your groups" });
+
+  test("are one tap from the panel, and marked on their pages", () => {
+    address.pathname = "/groups/group";
+    renderShell();
+
+    expect(groups().getAttribute("href")).toBe("/groups");
+    expect(groups().getAttribute("aria-current")).toBe("page");
+  });
+
+  test("are not marked elsewhere", () => {
+    address.pathname = "/";
+    renderShell();
+
+    expect(groups().getAttribute("aria-current")).toBeNull();
   });
 });
 

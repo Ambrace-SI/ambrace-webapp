@@ -94,7 +94,7 @@ describe("what is sent to the API", () => {
       toProfileUpdate(draft({ name: "  Asha Rao  ", board: "CBSE" }), {
         includeOptional: false,
       }),
-    ).toEqual({ name: "Asha Rao", class_level: 9 });
+    ).toEqual({ name: "Asha Rao", account_type: "student", class_level: 9 });
   });
 
   test("the second step sends everything, with blanks as null", () => {
@@ -105,6 +105,7 @@ describe("what is sent to the API", () => {
       ),
     ).toEqual({
       name: "Asha Rao",
+      account_type: "student",
       class_level: 9,
       board: "ICSE",
       school_name: null,
@@ -117,6 +118,25 @@ describe("what is sent to the API", () => {
       toProfileUpdate(draft({ classLevel: null }), { includeOptional: false }),
     ).toThrow();
   });
+});
+
+describe("a teacher's or parent's profile", () => {
+  const educator = (changes: Partial<ProfileDraft> = {}) =>
+    draft({ accountType: "teacher", classLevel: null, ...changes });
+
+  test("needs only a name, no class", () => {
+    expect(hasErrors(validateRequired(educator()))).toBe(false);
+    expect(validateRequired(educator({ name: "" })).name).toBeDefined();
+  });
+
+  test.each(["teacher", "parent"] as const)(
+    "a %s is sent with their type and without a class",
+    (accountType) => {
+      expect(
+        toProfileUpdate(educator({ accountType }), { includeOptional: false }),
+      ).toEqual({ name: "Asha Rao", account_type: accountType });
+    },
+  );
 });
 
 describe("the name offered from the sign-in account", () => {
@@ -169,6 +189,7 @@ describe("reading a failed API call", () => {
 describe("a saved profile, opened for editing", () => {
   const SAVED = {
     name: "Asha Rao",
+    account_type: "student" as const,
     class_level: 9,
     board: "CBSE" as const,
     school_name: "DPS",
@@ -179,6 +200,7 @@ describe("a saved profile, opened for editing", () => {
 
   test("is laid out the way the forms hold it", () => {
     expect(draftFromProfile(SAVED)).toEqual({
+      accountType: "student",
       name: "Asha Rao",
       classLevel: 9,
       board: "CBSE",
@@ -205,6 +227,7 @@ describe("a saved profile, opened for editing", () => {
       toProfileUpdate(draftFromProfile(SAVED), { includeOptional: true }),
     ).toEqual({
       name: "Asha Rao",
+      account_type: "student",
       class_level: 9,
       board: "CBSE",
       school_name: "DPS",

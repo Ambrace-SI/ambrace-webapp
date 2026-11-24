@@ -29,7 +29,17 @@ import { HOME_PATH } from "@/lib/auth/routes";
  * A page can ask for the whole screen (see useWholeScreen); the panel and the
  * bar are then put away until it hands the screen back.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  sidebar = <AppSidebar />,
+  homePath = HOME_PATH,
+}: {
+  children: ReactNode;
+  /** The student's panel by default; the teacher's side passes its own. */
+  sidebar?: ReactNode;
+  /** Where the logo in the phone's top bar leads. */
+  homePath?: string;
+}) {
   const open = useSyncExternalStore(
     panelPreference.subscribe,
     panelPreference.isOpen,
@@ -44,13 +54,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={300}>
       <SidebarProvider open={open} onOpenChange={panelPreference.remember}>
-        {wholeScreen ? null : <AppSidebar />}
+        {wholeScreen ? null : sidebar}
         <SidebarInset>
           {wholeScreen ? null : (
             <header className="flex items-center gap-1 border-b border-border px-2 py-1.5 md:hidden">
               <SidebarTrigger />
               <Link
-                href={HOME_PATH}
+                href={homePath}
                 className="rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <Logo surface="theme" className="w-[120px]" priority />

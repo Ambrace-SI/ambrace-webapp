@@ -1,6 +1,6 @@
 "use client";
 
-import { HistoryIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { HistoryIcon, PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -22,7 +22,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { HOME_PATH } from "@/lib/auth/routes";
+import { HOME_PATH, STUDENT_GROUPS_PATH } from "@/lib/auth/routes";
 
 /**
  * The side panel: start a viva, find an old one, open a report, sign out.
@@ -72,6 +72,11 @@ export function AppSidebar() {
             {/* Which page is open is only known in the browser. */}
             <Suspense fallback={<NewVivaRow onNavigate={closeDrawer} />}>
               <NewVivaRowForThisPage onNavigate={closeDrawer} />
+            </Suspense>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <Suspense fallback={<GroupsRow onNavigate={closeDrawer} />}>
+              <GroupsRowForThisPage onNavigate={closeDrawer} />
             </Suspense>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -153,4 +158,34 @@ function NewVivaRow({
 function NewVivaRowForThisPage({ onNavigate }: { onNavigate: () => void }) {
   const current = usePathname() === HOME_PATH;
   return <NewVivaRow current={current} onNavigate={onNavigate} />;
+}
+
+/** The groups the student has joined, and through them the vivas set there. */
+function GroupsRow({
+  current = false,
+  onNavigate,
+}: {
+  current?: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <SidebarMenuButton asChild isActive={current} tooltip="Your groups">
+      <Link
+        href={STUDENT_GROUPS_PATH}
+        aria-current={current ? "page" : undefined}
+        onClick={onNavigate}
+      >
+        <UsersIcon aria-hidden="true" />
+        <SidebarMenuLabel>Your groups</SidebarMenuLabel>
+      </Link>
+    </SidebarMenuButton>
+  );
+}
+
+function GroupsRowForThisPage({ onNavigate }: { onNavigate: () => void }) {
+  const pathname = usePathname();
+  const current =
+    pathname === STUDENT_GROUPS_PATH ||
+    pathname.startsWith(`${STUDENT_GROUPS_PATH}/`);
+  return <GroupsRow current={current} onNavigate={onNavigate} />;
 }

@@ -11,6 +11,7 @@ import { privateContentLeaks } from "./helpers/private-content";
 
 const PROFILE: Profile = {
   name: "Asha Rao",
+  account_type: "student",
   class_level: 9,
   board: "STATE_BOARD",
   school_name: "Hill View School",

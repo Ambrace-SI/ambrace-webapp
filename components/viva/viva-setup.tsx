@@ -12,7 +12,7 @@ import type { CurriculumSelection } from "@/lib/curriculum/types";
 import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
 import { useVivaStore } from "@/lib/store/viva-store";
 import { cn } from "@/lib/utils";
-import { BOARD_LABELS, type Profile } from "@/types/profile";
+import { BOARD_LABELS, MIN_CLASS_LEVEL, type Profile } from "@/types/profile";
 import { DEFAULT_VOICE } from "@/types/viva";
 
 export type VivaChoice = { selection: CurriculumSelection; voiceName: string };
@@ -38,7 +38,9 @@ export function VivaSetup({
   error: string | null;
   onStart: (choice: VivaChoice) => void;
 }) {
-  const setup = useVivaSetup(profile.class_level);
+  // Only students reach this screen (the gate sends educators to /teach), and
+  // a student's profile always has a class.
+  const setup = useVivaSetup(profile.class_level ?? MIN_CLASS_LEVEL);
 
   function submit(event: FormEvent) {
     event.preventDefault();

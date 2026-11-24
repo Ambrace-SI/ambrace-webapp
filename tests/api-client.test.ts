@@ -158,13 +158,21 @@ describe("profile calls", () => {
     });
 
     expect((await getMe()).user_id).toBe("user-1");
-    await saveProfile({ name: "Asha Rao", class_level: 9 });
+    await saveProfile({
+      name: "Asha Rao",
+      account_type: "student",
+      class_level: 9,
+    });
 
     expect(sent.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "get /api/v1/me",
       "put /api/v1/me",
     ]);
-    expect(sent[1].body).toEqual({ name: "Asha Rao", class_level: 9 });
+    expect(sent[1].body).toEqual({
+      name: "Asha Rao",
+      account_type: "student",
+      class_level: 9,
+    });
   });
 
   test("an expired session is recognisable to the screens", async () => {

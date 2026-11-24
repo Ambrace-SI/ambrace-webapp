@@ -25,7 +25,7 @@ import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { leaveAmbrace } from "@/lib/app/sign-out";
 import { useMe } from "@/lib/hooks/use-me";
 import { settingsWindow } from "@/lib/settings/settings-window";
-import { BOARD_LABELS } from "@/types/profile";
+import { BOARD_LABELS, EDUCATOR_LABELS, isEducator } from "@/types/profile";
 
 /**
  * Who is signed in, at the foot of the side panel, with the way to their
@@ -43,7 +43,9 @@ export function AccountMenu() {
   const name = profile?.name.trim() || "Your account";
   const details = profile
     ? [
-        `Class ${profile.class_level}`,
+        isEducator(profile.account_type)
+          ? EDUCATOR_LABELS[profile.account_type]
+          : `Class ${profile.class_level}`,
         profile.board ? BOARD_LABELS[profile.board] : null,
       ]
         .filter(Boolean)

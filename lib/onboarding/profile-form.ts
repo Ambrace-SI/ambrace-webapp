@@ -2,6 +2,8 @@ import {
   BOARDS,
   MAX_CLASS_LEVEL,
   MIN_CLASS_LEVEL,
+  isEducator,
+  type AccountType,
   type Board,
   type Profile,
   type ProfileUpdate,
@@ -19,6 +21,7 @@ export const SCHOOL_NAME_MAX_LENGTH = 150;
 export const SCHOOL_ADDRESS_MAX_LENGTH = 300;
 
 export type ProfileDraft = {
+  accountType: AccountType;
   name: string;
   classLevel: number | null;
   board: Board | null;
@@ -27,6 +30,7 @@ export type ProfileDraft = {
 };
 
 export const EMPTY_DRAFT: ProfileDraft = {
+  accountType: "student",
   name: "",
   classLevel: null,
   board: null,
@@ -37,6 +41,7 @@ export const EMPTY_DRAFT: ProfileDraft = {
 /** A saved profile, laid out the way the forms hold it while it is edited. */
 export function draftFromProfile(profile: Profile): ProfileDraft {
   return {
+    accountType: profile.account_type,
     name: profile.name,
     classLevel: profile.class_level,
     board: profile.board,
@@ -66,6 +71,9 @@ export function validateRequired(draft: ProfileDraft): ProfileErrors {
     errors.name =
       "Your name has a character we can't use. Try typing it again.";
   }
+
+  // A teacher's or parent's classes belong to their groups.
+  if (isEducator(draft.accountType)) return errors;
 
   if (draft.classLevel === null) {
     errors.classLevel = "Pick your class.";
@@ -110,20 +118,29 @@ function blankToNull(value: string): string | null {
   return value.trim() || null;
 }
 
+/** The fields every save must carry for this kind of account. */
+function requiredFields(draft: ProfileDraft): ProfileUpdate {
+  const name = draft.name.trim();
+  if (isEducator(draft.accountType)) {
+    return { name, account_type: draft.accountType };
+  }
+  if (draft.classLevel === null) {
+    throw new Error("A class is required before the profile can be saved.");
+  }
+  return { name, account_type: "student", class_level: draft.classLevel };
+}
+
 /**
  * The request body for a draft that has passed validation.
  *
- * `includeOptional` is false after the first step, so the name and class are
- * saved at once and survive even if the student closes the tab on step two.
+ * `includeOptional` is false after the first step, so the required fields are
+ * saved at once and survive even if the person closes the tab on step two.
  */
 export function toProfileUpdate(
   draft: ProfileDraft,
   { includeOptional }: { includeOptional: boolean },
 ): ProfileUpdate {
-  if (draft.classLevel === null) {
-    throw new Error("A class is required before the profile can be saved.");
-  }
-  const required = { name: draft.name.trim(), class_level: draft.classLevel };
+  const required = requiredFields(draft);
   if (!includeOptional) return required;
 
   return {

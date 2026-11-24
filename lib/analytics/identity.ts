@@ -23,6 +23,7 @@ export function personProperties(me: Me, email: string | null) {
   return {
     onboarding_complete: me.onboarding_complete,
     name: profile?.name.trim() || null,
+    account_type: profile?.account_type ?? null,
     class_level: profile?.class_level ?? null,
     board: profile?.board ?? null,
     school_name: profile?.school_name ?? null,

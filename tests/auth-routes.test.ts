@@ -1,10 +1,15 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  homePathFor,
   isOpenPath,
   isSignedOutOnlyPath,
+  joinPath,
+  onboardingUrlFor,
   safeReturnPath,
   signInUrlFor,
+  studentGroupPath,
+  teachGroupPath,
 } from "@/lib/auth/routes";
 
 describe("which pages can be seen without signing in", () => {
@@ -71,5 +76,26 @@ describe("the sign-in address the gate redirects to", () => {
 
   test("stays clean when the destination is just home", () => {
     expect(signInUrlFor("/")).toBe("/sign-in");
+  });
+});
+
+describe("addresses for groups", () => {
+  test("a group and an invite carry their id in the query string", () => {
+    expect(teachGroupPath("a b")).toBe("/teach/group?id=a%20b");
+    expect(joinPath("K7QX2M")).toBe("/join?code=K7QX2M");
+    expect(studentGroupPath("g1")).toBe("/groups/group?id=g1");
+  });
+
+  test("each kind of account has its own start page", () => {
+    expect(homePathFor("student")).toBe("/");
+    expect(homePathFor("educator")).toBe("/teach");
+  });
+
+  test("onboarding remembers where someone was going, but not home", () => {
+    expect(onboardingUrlFor("/join", "?code=K7QX2M")).toBe(
+      "/onboarding?next=%2Fjoin%3Fcode%3DK7QX2M",
+    );
+    expect(onboardingUrlFor("/")).toBe("/onboarding");
+    expect(onboardingUrlFor("//evil.example")).toBe("/onboarding");
   });
 });

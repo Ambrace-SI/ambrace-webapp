@@ -14,6 +14,31 @@ export const AUTH_CALLBACK_PATH = "/auth/callback";
 export const ONBOARDING_PATH = "/onboarding";
 export const HOME_PATH = "/";
 export const VIVA_PATH = "/viva";
+export const JOIN_PATH = "/join";
+export const JOIN_CODE_PARAM = "code";
+
+/** A student's groups, and one of them. */
+export const STUDENT_GROUPS_PATH = "/groups";
+export const STUDENT_GROUP_PATH = "/groups/group";
+export const studentGroupPath = (groupId: string) =>
+  `${STUDENT_GROUP_PATH}?${GROUP_ID_PARAM}=${encodeURIComponent(groupId)}`;
+
+/** The educator's side of the app: their groups and what they assign. */
+export const TEACH_PATH = "/teach";
+export const TEACH_GROUP_PATH = "/teach/group";
+export const GROUP_ID_PARAM = "id";
+
+/** One group's page. Like reports, the id cannot be part of the path. */
+export const teachGroupPath = (groupId: string) =>
+  `${TEACH_GROUP_PATH}?${GROUP_ID_PARAM}=${encodeURIComponent(groupId)}`;
+
+/** The link a teacher shares. Signing in or onboarding first returns to it. */
+export const joinPath = (code: string) =>
+  `${JOIN_PATH}?${JOIN_CODE_PARAM}=${encodeURIComponent(code)}`;
+
+/** Where each kind of account starts. */
+export const homePathFor = (kind: "student" | "educator") =>
+  kind === "educator" ? TEACH_PATH : HOME_PATH;
 
 export const REPORT_PATH = "/v";
 /** Which report: the site is plain files, so it cannot be part of the path. */
@@ -70,6 +95,13 @@ export function safeReturnPath(candidate: string | null | undefined): string {
   if (isOpenPath(parsed.pathname)) return HOME_PATH;
 
   return `${parsed.pathname}${parsed.search}`;
+}
+
+/** The onboarding address that remembers where the person was heading. */
+export function onboardingUrlFor(pathname: string, search = ""): string {
+  const destination = safeReturnPath(`${pathname}${search}`);
+  if (destination === HOME_PATH) return ONBOARDING_PATH;
+  return `${ONBOARDING_PATH}?next=${encodeURIComponent(destination)}`;
 }
 
 /** The sign-in address that remembers where the person was heading. */

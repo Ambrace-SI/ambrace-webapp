@@ -14,6 +14,8 @@
  * student is lives on their PostHog person (`identity.ts`), not on events.
  */
 
+import type { AccountType, EducatorType } from "@/types/profile";
+
 import { captureEvent, readAnalyticsSettings } from "./posthog";
 
 export type SignInMethod = "google" | "password";
@@ -31,7 +33,11 @@ export type ProductEvents = {
   signed_out: Record<string, never>;
 
   /** The required part of the profile was saved for the first time. */
-  onboarding_completed: { class_level: number };
+  onboarding_completed: {
+    account_type: AccountType;
+    /** A student's class; null for teachers and parents. */
+    class_level: number | null;
+  };
   /** The optional part was saved too, rather than skipped. */
   onboarding_extras_saved: { board: string | null; has_school: boolean };
 
@@ -90,6 +96,20 @@ export type ProductEvents = {
   };
   /** The student closed the questions; `at` is the one they were on. */
   viva_feedback_dismissed: VivaSessionProperties & { at: FeedbackSubject };
+
+  /** A teacher or parent created a group. Never its name or its code. */
+  group_created: { class_level: number | null };
+  /** The owner replaced the code; the old link stopped working. */
+  group_code_replaced: Record<string, never>;
+  /** The owner copied or shared the invite. */
+  group_invite_shared: { via: "copy_link" | "copy_code" | "whatsapp" };
+  group_member_removed: Record<string, never>;
+  /** The owner deleted a group; `members` is how many were in it. */
+  group_deleted: { members: number };
+  /** A student opened an invite link; `found` is false for a dead code. */
+  group_invite_opened: { found: boolean };
+  /** A student joined: they agreed to share results with the group's owner. */
+  group_joined: { owner_type: EducatorType };
 };
 
 /** What a feedback question is about: the viva, or the report written on it. */
