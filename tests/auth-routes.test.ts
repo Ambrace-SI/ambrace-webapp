@@ -8,7 +8,9 @@ import {
   onboardingUrlFor,
   safeReturnPath,
   signInUrlFor,
+  startAssignedPath,
   studentGroupPath,
+  teachAssignPath,
   teachGroupPath,
 } from "@/lib/auth/routes";
 
@@ -84,6 +86,8 @@ describe("addresses for groups", () => {
     expect(teachGroupPath("a b")).toBe("/teach/group?id=a%20b");
     expect(joinPath("K7QX2M")).toBe("/join?code=K7QX2M");
     expect(studentGroupPath("g1")).toBe("/groups/group?id=g1");
+    expect(teachAssignPath("g1")).toBe("/teach/assign?id=g1");
+    expect(startAssignedPath("a1")).toBe("/?assignment=a1");
   });
 
   test("each kind of account has its own start page", () => {

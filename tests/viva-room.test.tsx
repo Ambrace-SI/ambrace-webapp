@@ -27,6 +27,16 @@ const SELECTION: CurriculumSelection = {
   chapters: [{ id: "cell", name: "Cell", topics: [] }],
 };
 
+/** A viva a teacher set: only its ids and what it covers matter here. */
+const ASSIGNED = {
+  assignment_id: "a1",
+  group_id: "g1",
+  curriculum_selection: {
+    ...SELECTION,
+    chapters: [{ id: "motion", name: "Motion", topics: [] }],
+  },
+};
+
 // What the room reports to analytics, recorded here instead of sent. The
 // following of one viva is tested on its own (analytics-viva.test.ts); here
 // it is a stand-in, and what is checked is when the room starts and ends it.
@@ -53,6 +63,7 @@ vi.mock("@/components/viva/viva-setup", () => ({
     starting: boolean;
     error: string | null;
     onStart: (choice: unknown) => void;
+    onStartAssigned?: (assignment: unknown) => void;
   }) => (
     <div>
       <p>setup for {props.profile.name}</p>
@@ -65,8 +76,19 @@ vi.mock("@/components/viva/viva-setup", () => ({
       >
         start
       </button>
+      <button onClick={() => props.onStartAssigned?.(ASSIGNED)}>
+        start assigned
+      </button>
     </div>
   ),
+}));
+
+const startAssignment = vi.fn();
+vi.mock("@/lib/groups/api", () => ({
+  startAssignment: (groupId: string, assignmentId: string) => {
+    calls.push("start assigned request");
+    return startAssignment(groupId, assignmentId);
+  },
 }));
 vi.mock("@/components/viva/live-session", () => ({
   LiveSession: (props: {
@@ -155,6 +177,8 @@ beforeEach(() => {
   calls.length = 0;
   startVivaSession.mockReset();
   startVivaSession.mockResolvedValue({ viva_session_id: "session-1" });
+  startAssignment.mockReset();
+  startAssignment.mockResolvedValue({ viva_session_id: "session-2" });
   abandonViva.mockReset();
   abandonViva.mockResolvedValue({ status: "abandoned" });
   wholeScreen.mockReset();
@@ -174,6 +198,46 @@ describe("arriving", () => {
     renderRoom();
 
     expect(screen.getByText(/setup for\s+Asha Rao/)).toBeTruthy();
+  });
+});
+
+describe("starting a viva a teacher set", () => {
+  test("the server builds it from the assignment; the room runs it as any other", async () => {
+    renderRoom();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "start assigned" }));
+
+    await screen.findByText("live: Science / Motion");
+    expect(startAssignment).toHaveBeenCalledWith("g1", "a1");
+    expect(startVivaSession).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      "reset",
+      "start assigned request",
+      "session data",
+      "initialise",
+    ]);
+    expect(analytics.track).toHaveBeenCalledWith(
+      "viva_requested",
+      expect.objectContaining({ chapter: "Motion", chapter_id: "motion" }),
+    );
+  });
+
+  test("finishing it refreshes the student's set vivas too", async () => {
+    renderRoom();
+    await pressStart();
+    await screen.findByText("live: Science / Cell");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "choose again" }));
+
+    await waitFor(() =>
+      expect(listRefreshed).toHaveBeenCalledWith({
+        queryKey: ["groups", "assigned"],
+      }),
+    );
   });
 });
 

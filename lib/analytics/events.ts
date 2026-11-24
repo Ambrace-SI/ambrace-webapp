@@ -104,6 +104,15 @@ export type ProductEvents = {
   /** The owner copied or shared the invite. */
   group_invite_shared: { via: "copy_link" | "copy_code" | "whatsapp" };
   group_member_removed: Record<string, never>;
+  /** The owner set a viva for a group. Never the group's name. */
+  assignment_created: {
+    class_level: number;
+    subject_id: string;
+    chapter_id: string;
+    topic_count: number;
+    has_due_date: boolean;
+  };
+  assignment_removed: { completed: number };
   /** The owner deleted a group; `members` is how many were in it. */
   group_deleted: { members: number };
   /** A student opened an invite link; `found` is false for a dead code. */

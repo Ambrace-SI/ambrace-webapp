@@ -17,6 +17,11 @@ export const VIVA_PATH = "/viva";
 export const JOIN_PATH = "/join";
 export const JOIN_CODE_PARAM = "code";
 
+/** Home, pointing out one set viva: where a group's "Start" leads. */
+export const ASSIGNMENT_PARAM = "assignment";
+export const startAssignedPath = (assignmentId: string) =>
+  `${HOME_PATH}?${ASSIGNMENT_PARAM}=${encodeURIComponent(assignmentId)}`;
+
 /** A student's groups, and one of them. */
 export const STUDENT_GROUPS_PATH = "/groups";
 export const STUDENT_GROUP_PATH = "/groups/group";
@@ -27,6 +32,11 @@ export const studentGroupPath = (groupId: string) =>
 export const TEACH_PATH = "/teach";
 export const TEACH_GROUP_PATH = "/teach/group";
 export const GROUP_ID_PARAM = "id";
+
+/** Setting a viva for one group. */
+export const TEACH_ASSIGN_PATH = "/teach/assign";
+export const teachAssignPath = (groupId: string) =>
+  `${TEACH_ASSIGN_PATH}?${GROUP_ID_PARAM}=${encodeURIComponent(groupId)}`;
 
 /** One group's page. Like reports, the id cannot be part of the path. */
 export const teachGroupPath = (groupId: string) =>

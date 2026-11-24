@@ -14,8 +14,15 @@ import {
   JOIN_PATH,
   STUDENT_GROUPS_PATH,
   studentGroupPath,
+  reportPath,
+  startAssignedPath,
 } from "@/lib/auth/routes";
-import { useJoinedGroups, useLeaveGroup } from "@/lib/groups/use-groups";
+import {
+  useAssigned,
+  useJoinedGroups,
+  useLeaveGroup,
+} from "@/lib/groups/use-groups";
+import type { StudentAssignment } from "@/types/assignments";
 import type { JoinedGroup } from "@/types/groups";
 import { EDUCATOR_LABELS } from "@/types/profile";
 
@@ -211,18 +218,7 @@ export function StudentGroup() {
         </p>
       </header>
 
-      <section aria-labelledby="vivas-heading" className="flex flex-col gap-4">
-        <h2 id="vivas-heading" className="label-mono text-muted-foreground">
-          Vivas
-        </h2>
-        <div className="rounded-xl border border-dashed border-border p-6">
-          <p className="font-medium">No vivas set yet</p>
-          <p className="mt-1 text-muted-foreground">
-            When {group.owner_name} sets a viva for this group, it appears here
-            and on your home page. Your reports from it go to them as well.
-          </p>
-        </div>
-      </section>
+      <GroupVivas group={group} />
 
       <section className="border-t border-border pt-6">
         {confirmingLeave ? (
@@ -260,5 +256,92 @@ export function StudentGroup() {
         )}
       </section>
     </main>
+  );
+}
+
+const DUE = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
+function dueText(dueOn: string | null): string | null {
+  if (!dueOn) return null;
+  const [year, month, day] = dueOn.split("-").map(Number);
+  return `Due ${DUE.format(new Date(year, month - 1, day))}`;
+}
+
+/**
+ * The vivas set in this group: to do first, then done with the score and a
+ * way to the report. Starting happens on home, where the live room is.
+ */
+function GroupVivas({ group }: { group: JoinedGroup }) {
+  const { data, error, refetch } = useAssigned();
+  const vivas = (data ?? []).filter((a) => a.group_id === group.group_id);
+
+  return (
+    <section aria-labelledby="vivas-heading" className="flex flex-col gap-4">
+      <h2 id="vivas-heading" className="label-mono text-muted-foreground">
+        Vivas
+      </h2>
+      {error ? (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-muted-foreground">
+            We couldn&apos;t load the vivas.
+          </span>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : !data ? (
+        <Skeleton className="h-16 rounded-xl" />
+      ) : vivas.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-6">
+          <p className="font-medium">No vivas set yet</p>
+          <p className="mt-1 text-muted-foreground">
+            When {group.owner_name} sets a viva for this group, it appears here
+            and on your home page. Your reports from it go to them as well.
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
+          {vivas.map((viva) => (
+            <GroupVivaRow key={viva.assignment_id} viva={viva} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function GroupVivaRow({ viva }: { viva: StudentAssignment }) {
+  const done = viva.status === "done";
+  return (
+    <li className="flex items-center justify-between gap-4 px-4 py-3">
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-medium">{viva.title}</span>
+        <span className="truncate text-sm text-muted-foreground">
+          {[viva.subject_name, done ? "Done" : dueText(viva.due_on)]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </div>
+      {done && viva.session_id ? (
+        <Button asChild variant="outline" size="touch" className="shrink-0">
+          <Link href={reportPath(viva.session_id)}>
+            <span className="font-mono">{viva.score}/10</span> Report
+          </Link>
+        </Button>
+      ) : (
+        <Button asChild size="touch" className="shrink-0">
+          <Link
+            href={startAssignedPath(viva.assignment_id)}
+            aria-label={`Start ${viva.title}`}
+          >
+            Start
+          </Link>
+        </Button>
+      )}
+    </li>
   );
 }

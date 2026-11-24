@@ -1,11 +1,12 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import type { CSSProperties, FormEvent } from "react";
+import { Suspense, type CSSProperties, type FormEvent } from "react";
 
 import { WelcomeMark } from "@/components/brand/welcome-mark";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
+import { AssignedList } from "@/components/viva/assigned-list";
 import { ChoiceBar } from "@/components/viva/choice-bar";
 import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
@@ -13,6 +14,7 @@ import { useVivaSetup, type VivaSetup } from "@/lib/hooks/use-viva-setup";
 import { useVivaStore } from "@/lib/store/viva-store";
 import { cn } from "@/lib/utils";
 import { BOARD_LABELS, MIN_CLASS_LEVEL, type Profile } from "@/types/profile";
+import type { StudentAssignment } from "@/types/assignments";
 import { DEFAULT_VOICE } from "@/types/viva";
 
 export type VivaChoice = { selection: CurriculumSelection; voiceName: string };
@@ -32,11 +34,14 @@ export function VivaSetup({
   starting,
   error,
   onStart,
+  onStartAssigned,
 }: {
   profile: Profile;
   starting: boolean;
   error: string | null;
   onStart: (choice: VivaChoice) => void;
+  /** Starts a viva a teacher or parent set; none are offered without it. */
+  onStartAssigned?: (assignment: StudentAssignment) => void;
 }) {
   // Only students reach this screen (the gate sends educators to /teach), and
   // a student's profile always has a class.
@@ -53,6 +58,12 @@ export function VivaSetup({
       <main className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-10 text-center">
         <WelcomeMark className="w-48 sm:w-60" />
         <Greeting profile={profile} line={lineFor(setup, starting)} />
+        {onStartAssigned ? (
+          // Which one to point out comes from the address.
+          <Suspense fallback={null}>
+            <AssignedList starting={starting} onStart={onStartAssigned} />
+          </Suspense>
+        ) : null}
       </main>
 
       {/* Always within reach of a thumb, and always saying what happens next. */}

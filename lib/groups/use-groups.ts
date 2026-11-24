@@ -8,11 +8,15 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  createAssignment,
   createGroup,
+  deleteAssignment,
   deleteGroup,
   getGroup,
   joinGroup,
   leaveGroup,
+  listAssigned,
+  listAssignments,
   listJoinedGroups,
   listOwnedGroups,
   previewInvite,
@@ -20,12 +24,17 @@ import {
   renameGroup,
   replaceJoinCode,
 } from "@/lib/groups/api";
+import type { AssignmentCreate } from "@/types/assignments";
 import type { GroupCreate, GroupDetail, GroupSummary } from "@/types/groups";
 
 export const OWNED_GROUPS_KEY = ["groups", "owned"] as const;
 export const JOINED_GROUPS_KEY = ["groups", "joined"] as const;
 export const groupKey = (groupId: string) =>
   ["groups", "one", groupId] as const;
+export const assignmentsKey = (groupId: string) =>
+  ["groups", "assignments", groupId] as const;
+/** The student's set vivas. Refreshed whenever a viva ends. */
+export const ASSIGNED_KEY = ["groups", "assigned"] as const;
 
 /**
  * A change to one group is also a change to the list beside it (name, code,
@@ -152,4 +161,40 @@ export function useLeaveGroup() {
       void queryClient.invalidateQueries({ queryKey: JOINED_GROUPS_KEY });
     },
   });
+}
+
+// ------------------------------------------------------------ set vivas
+
+export function useGroupAssignments(groupId: string | null) {
+  return useQuery({
+    queryKey: assignmentsKey(groupId ?? ""),
+    queryFn: () => listAssignments(groupId as string),
+    enabled: Boolean(groupId),
+  });
+}
+
+export function useCreateAssignment(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assignment: AssignmentCreate) =>
+      createAssignment(groupId, assignment),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: assignmentsKey(groupId) });
+    },
+  });
+}
+
+export function useDeleteAssignment(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assignmentId: string) =>
+      deleteAssignment(groupId, assignmentId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: assignmentsKey(groupId) });
+    },
+  });
+}
+
+export function useAssigned() {
+  return useQuery({ queryKey: ASSIGNED_KEY, queryFn: listAssigned });
 }

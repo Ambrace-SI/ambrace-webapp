@@ -43,6 +43,20 @@ describe("the groups client calls the documented routes", () => {
       ["/api/v1/groups/join", { code: "K7QX2M" }],
     ],
     ["listJoinedGroups", [], "get", ["/api/v1/groups/joined"]],
+    ["listAssignments", ["g1"], "get", ["/api/v1/groups/g1/assignments"]],
+    [
+      "createAssignment",
+      ["g1", { due_on: null }],
+      "post",
+      ["/api/v1/groups/g1/assignments", { due_on: null }],
+    ],
+    ["listAssigned", [], "get", ["/api/v1/groups/assigned"]],
+    [
+      "startAssignment",
+      ["g1", "a1"],
+      "post",
+      ["/api/v1/groups/g1/assignments/a1/start"],
+    ],
   ] as const)("%s", async (name, args, method, expected) => {
     const call = groups[name] as (...a: unknown[]) => Promise<unknown>;
 
@@ -53,12 +67,16 @@ describe("the groups client calls the documented routes", () => {
 
   test("removing, leaving and deleting send DELETE, with ids escaped", async () => {
     await groups.deleteGroup("g1");
+    await groups.deleteAssignment("g1", "a 1");
     await groups.removeMember("g1", "a/b");
     await groups.leaveGroup("g 1");
 
     expect(api.delete).toHaveBeenCalledWith("/api/v1/groups/g1/members/a%2Fb");
     expect(api.delete).toHaveBeenCalledWith("/api/v1/groups/joined/g%201");
     expect(api.delete).toHaveBeenCalledWith("/api/v1/groups/g1");
+    expect(api.delete).toHaveBeenCalledWith(
+      "/api/v1/groups/g1/assignments/a%201",
+    );
   });
 });
 

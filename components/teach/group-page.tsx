@@ -2,6 +2,7 @@
 
 import {
   ArrowLeftIcon,
+  PlusIcon,
   CopyIcon,
   MessageCircleIcon,
   PencilIcon,
@@ -20,10 +21,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { track } from "@/lib/analytics/events";
 import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import { httpStatus } from "@/lib/api/errors";
-import { GROUP_ID_PARAM, TEACH_PATH, joinPath } from "@/lib/auth/routes";
 import {
+  GROUP_ID_PARAM,
+  TEACH_PATH,
+  joinPath,
+  teachAssignPath,
+} from "@/lib/auth/routes";
+import {
+  useDeleteAssignment,
   useDeleteGroup,
   useGroup,
+  useGroupAssignments,
   useRemoveMember,
   useReplaceJoinCode,
 } from "@/lib/groups/use-groups";
@@ -35,6 +43,7 @@ import {
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { useMe } from "@/lib/hooks/use-me";
 import { cn } from "@/lib/utils";
+import type { Assignment } from "@/types/assignments";
 import type { GroupDetail, GroupMember } from "@/types/groups";
 import type { EducatorType } from "@/types/profile";
 
@@ -91,6 +100,7 @@ export function GroupPage() {
   return (
     <main className="animate-rise mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-10 sm:px-10 sm:py-14">
       <GroupHeader group={group} kind={kind} />
+      <SetVivas group={group} kind={kind} />
       <InvitePanel group={group} kind={kind} />
       <Roster group={group} kind={kind} />
       <DeleteGroup group={group} kind={kind} />
@@ -220,7 +230,7 @@ function InvitePanel({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button
-          variant="ember"
+          variant={group.member_count === 0 ? "ember" : "default"}
           size="touch"
           disabled={!link}
           onClick={() => void copy(link, "Link", "copy_link")}
@@ -464,5 +474,151 @@ function DeleteGroup({
         </Button>
       )}
     </section>
+  );
+}
+
+const DUE = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
+/** A due day (YYYY-MM-DD) read as a local calendar day, not a UTC moment. */
+export function dueLabel(dueOn: string | null): string {
+  if (!dueOn) return "No due date";
+  const [year, month, day] = dueOn.split("-").map(Number);
+  return `Due ${DUE.format(new Date(year, month - 1, day))}`;
+}
+
+/**
+ * The vivas set for this group, newest first, with how many have finished
+ * each. Once the group has people in it, setting a viva is the page's main
+ * action, so the button takes Ember from the invite.
+ */
+function SetVivas({ group, kind }: { group: GroupDetail; kind: EducatorType }) {
+  const {
+    data: assignments,
+    error,
+    refetch,
+  } = useGroupAssignments(group.group_id);
+  const hasMembers = group.member_count > 0;
+
+  return (
+    <section aria-labelledby="vivas-heading" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="vivas-heading" className="label-mono text-muted-foreground">
+          Vivas
+        </h2>
+        <Button asChild variant={hasMembers ? "ember" : "outline"} size="touch">
+          <Link href={teachAssignPath(group.group_id)}>
+            <PlusIcon aria-hidden="true" />
+            Set a viva
+          </Link>
+        </Button>
+      </div>
+      {error ? (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-muted-foreground">
+            We couldn&apos;t load the vivas.
+          </span>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : !assignments ? (
+        <Skeleton className="h-16 rounded-xl" />
+      ) : assignments.length === 0 ? (
+        <p className="text-muted-foreground">
+          No vivas set yet. Set one and your {membersNoun(kind)} will see it on
+          their home page.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
+          {assignments.map((assignment) => (
+            <AssignmentRow
+              key={assignment.assignment_id}
+              group={group}
+              assignment={assignment}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AssignmentRow({
+  group,
+  assignment,
+}: {
+  group: GroupDetail;
+  assignment: Assignment;
+}) {
+  const remove = useDeleteAssignment(group.group_id);
+  const [confirming, setConfirming] = useState(false);
+  const topics = assignment.curriculum_selection.chapters[0]?.topics ?? [];
+
+  async function confirmRemove() {
+    try {
+      await remove.mutateAsync(assignment.assignment_id);
+      track("assignment_removed", { completed: assignment.completed_count });
+    } catch {
+      toast.error("Couldn't remove the viva. Try again.");
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <li className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-medium">{assignment.title}</span>
+          <span className="text-sm text-muted-foreground">
+            {[
+              assignment.curriculum_selection.subject_name,
+              topics.length
+                ? topics.map((topic) => topic.name).join(", ")
+                : "Whole chapter",
+              dueLabel(assignment.due_on),
+            ].join(" · ")}
+          </span>
+        </div>
+        <span className="font-mono text-sm whitespace-nowrap">
+          {assignment.completed_count} of {group.member_count} done
+        </span>
+      </div>
+      {confirming ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="text-sm">
+            Removing it also removes the reports already sent for it.
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={remove.isPending}
+              onClick={() => void confirmRemove()}
+            >
+              Remove viva
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+            >
+              Keep
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="link"
+          className="h-auto self-start p-0 text-sm text-muted-foreground"
+          onClick={() => setConfirming(true)}
+        >
+          Remove
+        </Button>
+      )}
+    </li>
   );
 }

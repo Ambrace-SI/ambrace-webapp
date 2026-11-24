@@ -1,5 +1,10 @@
 import api from "@/lib/api/axios";
 import type {
+  Assignment,
+  AssignmentCreate,
+  StudentAssignment,
+} from "@/types/assignments";
+import type {
   GroupCreate,
   GroupDetail,
   GroupSummary,
@@ -7,6 +12,7 @@ import type {
   JoinedGroup,
   JoinGroupResult,
 } from "@/types/groups";
+import type { VivaStartResponse } from "@/types/viva";
 
 /**
  * Calls to /api/v1/groups. Kept out of lib/api/, which holds the frozen
@@ -78,4 +84,50 @@ export async function listJoinedGroups(): Promise<JoinedGroup[]> {
 
 export async function leaveGroup(groupId: string): Promise<void> {
   await api.delete(`${GROUPS_PATH}/joined/${encodeURIComponent(groupId)}`);
+}
+
+// ------------------------------------------------------------ set vivas
+
+const assignmentsPath = (groupId: string) =>
+  `${groupPath(groupId)}/assignments`;
+
+export async function listAssignments(groupId: string): Promise<Assignment[]> {
+  return (await api.get<Assignment[]>(assignmentsPath(groupId))).data;
+}
+
+export async function createAssignment(
+  groupId: string,
+  assignment: AssignmentCreate,
+): Promise<Assignment> {
+  return (await api.post<Assignment>(assignmentsPath(groupId), assignment))
+    .data;
+}
+
+export async function deleteAssignment(
+  groupId: string,
+  assignmentId: string,
+): Promise<void> {
+  await api.delete(
+    `${assignmentsPath(groupId)}/${encodeURIComponent(assignmentId)}`,
+  );
+}
+
+/** Every viva set for the signed-in student, across their groups. */
+export async function listAssigned(): Promise<StudentAssignment[]> {
+  return (await api.get<StudentAssignment[]>(`${GROUPS_PATH}/assigned`)).data;
+}
+
+/**
+ * Starts a set viva. The server builds it from the assignment and answers
+ * exactly as /viva/start does, so the voice engine takes it unchanged.
+ */
+export async function startAssignment(
+  groupId: string,
+  assignmentId: string,
+): Promise<VivaStartResponse> {
+  return (
+    await api.post<VivaStartResponse>(
+      `${assignmentsPath(groupId)}/${encodeURIComponent(assignmentId)}/start`,
+    )
+  ).data;
 }

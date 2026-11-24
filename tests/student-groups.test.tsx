@@ -9,11 +9,21 @@ import {
   StudentGroup,
   StudentGroups,
 } from "@/components/groups/student-groups";
+import type { StudentAssignment } from "@/types/assignments";
 import type { JoinedGroup } from "@/types/groups";
 
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: ReactNode }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: ReactNode;
+  }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -31,6 +41,7 @@ vi.mock("sonner", () => ({ toast }));
 const groupsApi = vi.hoisted(() => ({
   listJoinedGroups: vi.fn(),
   leaveGroup: vi.fn(),
+  listAssigned: vi.fn(),
 }));
 vi.mock("@/lib/groups/api", () => groupsApi);
 
@@ -51,6 +62,29 @@ const FAMILY: JoinedGroup = {
   class_level: null,
 };
 
+const VIVA: StudentAssignment = {
+  assignment_id: "a1",
+  group_id: "g1",
+  group_name: "Class 9-A",
+  owner_name: "Meera Sharma",
+  owner_type: "teacher",
+  title: "Motion",
+  subject_name: "Science",
+  curriculum_selection: {
+    catalog_id: "ncert-cbse",
+    catalog_version: "v1",
+    class_level: 9,
+    subject_id: "science",
+    subject_name: "Science",
+    chapters: [{ id: "motion", name: "Motion", topics: [] }],
+  },
+  due_on: null,
+  created_at: "2026-11-24T10:00:00Z",
+  status: "pending",
+  score: null,
+  session_id: null,
+};
+
 function renderPage(page: ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -62,6 +96,8 @@ function renderPage(page: ReactNode) {
 beforeEach(() => {
   groupsApi.listJoinedGroups.mockReset();
   groupsApi.leaveGroup.mockReset();
+  groupsApi.listAssigned.mockReset();
+  groupsApi.listAssigned.mockResolvedValue([]);
   address.search = "id=g1";
   address.replace.mockReset();
   toast.success.mockReset();
@@ -119,7 +155,7 @@ describe("one group, as its student sees it", () => {
 
     await screen.findByRole("heading", { name: "Class 9-A" });
     expect(screen.getByText("Teacher · Meera Sharma · Class 9")).toBeTruthy();
-    expect(screen.getByText("No vivas set yet")).toBeTruthy();
+    expect(await screen.findByText("No vivas set yet")).toBeTruthy();
     expect(screen.getByText(/When Meera Sharma sets a viva/)).toBeTruthy();
   });
 
@@ -171,6 +207,44 @@ describe("one group, as its student sees it", () => {
       ),
     );
     expect(address.replace).not.toHaveBeenCalled();
+  });
+
+  test("lists the group's vivas: Start for one to do, score and report once done", async () => {
+    groupsApi.listJoinedGroups.mockResolvedValue([CLASS_9A]);
+    groupsApi.listAssigned.mockResolvedValue([
+      { ...VIVA, assignment_id: "a1", title: "Motion", due_on: "2099-01-02" },
+      {
+        ...VIVA,
+        assignment_id: "a2",
+        title: "Force",
+        status: "done",
+        score: 7,
+        session_id: "s1",
+      },
+      // Another group's viva is not shown here.
+      { ...VIVA, assignment_id: "a3", group_id: "g2", title: "Fractions" },
+    ]);
+    renderPage(<StudentGroup />);
+
+    const start = await screen.findByRole("link", { name: "Start Motion" });
+    expect(start.getAttribute("href")).toBe("/?assignment=a1");
+    expect(screen.getByText(/Science · Due/)).toBeTruthy();
+    const report = screen.getByRole("link", { name: /7\/10 Report/ });
+    expect(report.getAttribute("href")).toBe("/v?id=s1");
+    expect(screen.queryByText("Fractions")).toBeNull();
+  });
+
+  test("a failed vivas load offers a retry", async () => {
+    groupsApi.listJoinedGroups.mockResolvedValue([CLASS_9A]);
+    groupsApi.listAssigned.mockRejectedValueOnce(new Error("offline"));
+    groupsApi.listAssigned.mockResolvedValueOnce([
+      { ...VIVA, assignment_id: "a1", title: "Motion" },
+    ]);
+    const user = renderPage(<StudentGroup />);
+
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await screen.findByRole("link", { name: "Start Motion" });
   });
 
   test("a group they are not in says so", async () => {
