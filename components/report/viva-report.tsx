@@ -14,6 +14,16 @@ import { httpStatus } from "@/lib/api/errors";
 import { HOME_PATH, REPORT_ID_PARAM } from "@/lib/auth/routes";
 import { useVivaResult } from "@/lib/hooks/use-viva-result";
 
+/** The fields a report shows; a student's session and a set viva's result share them. */
+type ReportFeedback = {
+  score: number;
+  summary: string;
+  strong_points: string[];
+  areas_of_improvement: string[];
+  next_steps?: string[] | null;
+  coverage_note?: string | null;
+};
+
 const DATE = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
@@ -95,6 +105,30 @@ export function VivaReport() {
         <h1 className="text-2xl tracking-tight sm:text-3xl">{session.topic}</h1>
       </div>
 
+      <ReportBody feedback={feedback} />
+
+      {/* After everything there is to read, and before the way on. */}
+      <VivaFeedbackPrompt
+        key={session.viva_session_id}
+        vivaSessionId={session.viva_session_id}
+        score={feedback.score}
+      />
+
+      <div className="flex flex-col gap-3 border-t border-border pt-8 sm:flex-row">
+        <StartAnother />
+      </div>
+    </main>
+  );
+}
+
+/**
+ * What there is to read in a report: the score, the summary, and the three
+ * lists. Shared by the student's own report and the copy their teacher or
+ * parent reads, so both always say the same thing.
+ */
+export function ReportBody({ feedback }: { feedback: ReportFeedback }) {
+  return (
+    <>
       <section aria-label="Score" className="flex flex-col gap-4">
         <p className="font-heading text-7xl leading-none font-light tracking-tight sm:text-8xl">
           {feedback.score}
@@ -138,18 +172,7 @@ export function VivaReport() {
           }
         />
       ) : null}
-
-      {/* After everything there is to read, and before the way on. */}
-      <VivaFeedbackPrompt
-        key={session.viva_session_id}
-        vivaSessionId={session.viva_session_id}
-        score={feedback.score}
-      />
-
-      <div className="flex flex-col gap-3 border-t border-border pt-8 sm:flex-row">
-        <StartAnother />
-      </div>
-    </main>
+    </>
   );
 }
 

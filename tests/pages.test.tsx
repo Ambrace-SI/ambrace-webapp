@@ -81,6 +81,10 @@ vi.mock("@/components/teach/teach-home", () => ({
 vi.mock("@/components/teach/assign-viva", () => ({
   AssignViva: () => <p>assign viva</p>,
 }));
+vi.mock("@/components/teach/viva-results", () => ({
+  VivaResults: () => <p>viva results</p>,
+  StudentResultReport: () => <p>student report</p>,
+}));
 vi.mock("@/components/teach/group-page", () => ({
   GroupPage: () => <p>group page</p>,
 }));
@@ -229,6 +233,8 @@ describe("the teacher's and parent's side", () => {
     ["(teach)/teach/page", "Your groups", "teacher home"],
     ["(teach)/teach/group/page", "Group", "group page"],
     ["(teach)/teach/assign/page", "Set a viva", "assign viva"],
+    ["(teach)/teach/viva/page", "Viva results", "viva results"],
+    ["(teach)/teach/report/page", "Student report", "student report"],
   ])("%s is titled %j", async (path, title, content) => {
     const page = await import(`@/app/${path}.tsx`);
 

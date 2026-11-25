@@ -110,7 +110,12 @@ describe("the list of a student's groups", () => {
     groupsApi.listJoinedGroups.mockResolvedValue([CLASS_9A, FAMILY]);
     renderPage(<StudentGroups />);
 
-    const first = await screen.findByRole("link", { name: /Class 9-A/ });
+    // The first render in this file is the slowest under coverage.
+    const first = await screen.findByRole(
+      "link",
+      { name: /Class 9-A/ },
+      { timeout: 3000 },
+    );
     expect(first.getAttribute("href")).toBe("/groups/group?id=g1");
     expect(first.textContent).toMatch(/Teacher · Meera Sharma · Class 9/);
     expect(screen.getByRole("link", { name: /Home/ }).textContent).toMatch(

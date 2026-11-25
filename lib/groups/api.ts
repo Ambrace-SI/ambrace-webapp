@@ -2,7 +2,9 @@ import api from "@/lib/api/axios";
 import type {
   Assignment,
   AssignmentCreate,
+  AssignmentResults,
   StudentAssignment,
+  StudentReport,
 } from "@/types/assignments";
 import type {
   GroupCreate,
@@ -128,6 +130,32 @@ export async function startAssignment(
   return (
     await api.post<VivaStartResponse>(
       `${assignmentsPath(groupId)}/${encodeURIComponent(assignmentId)}/start`,
+    )
+  ).data;
+}
+
+// ------------------------------------------------------ what the owner reads
+
+const resultsPath = (groupId: string, assignmentId: string) =>
+  `${assignmentsPath(groupId)}/${encodeURIComponent(assignmentId)}/results`;
+
+export async function getAssignmentResults(
+  groupId: string,
+  assignmentId: string,
+): Promise<AssignmentResults> {
+  return (await api.get<AssignmentResults>(resultsPath(groupId, assignmentId)))
+    .data;
+}
+
+/** A student's report for the group's owner. It never holds a transcript. */
+export async function getStudentReport(
+  groupId: string,
+  assignmentId: string,
+  studentId: string,
+): Promise<StudentReport> {
+  return (
+    await api.get<StudentReport>(
+      `${resultsPath(groupId, assignmentId)}/${encodeURIComponent(studentId)}`,
     )
   ).data;
 }

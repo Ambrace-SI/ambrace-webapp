@@ -42,6 +42,24 @@ export const teachAssignPath = (groupId: string) =>
 export const teachGroupPath = (groupId: string) =>
   `${TEACH_GROUP_PATH}?${GROUP_ID_PARAM}=${encodeURIComponent(groupId)}`;
 
+/** One set viva's results, and one student's report from it. */
+export const TEACH_VIVA_PATH = "/teach/viva";
+export const TEACH_REPORT_PATH = "/teach/report";
+export const VIVA_PARAM = "viva";
+export const STUDENT_PARAM = "student";
+export const teachVivaPath = (groupId: string, assignmentId: string) =>
+  `${TEACH_VIVA_PATH}?${new URLSearchParams({ [GROUP_ID_PARAM]: groupId, [VIVA_PARAM]: assignmentId })}`;
+export const teachReportPath = (
+  groupId: string,
+  assignmentId: string,
+  studentId: string,
+) =>
+  `${TEACH_REPORT_PATH}?${new URLSearchParams({
+    [GROUP_ID_PARAM]: groupId,
+    [VIVA_PARAM]: assignmentId,
+    [STUDENT_PARAM]: studentId,
+  })}`;
+
 /** The link a teacher shares. Signing in or onboarding first returns to it. */
 export const joinPath = (code: string) =>
   `${JOIN_PATH}?${JOIN_CODE_PARAM}=${encodeURIComponent(code)}`;

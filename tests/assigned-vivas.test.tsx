@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { ReactNode } from "react";
@@ -113,6 +119,7 @@ const SET: Assignment = {
   due_on: "2099-01-02",
   created_at: "2026-11-24T10:00:00Z",
   completed_count: 3,
+  average_score: 6.4,
 };
 
 const WAITING: StudentAssignment = {
@@ -181,16 +188,106 @@ afterEach(() => {
 });
 
 describe("the vivas on a teacher's group page", () => {
-  test("list each with its scope, due day and progress, and lead to setting one", async () => {
+  const PAST = "2020-01-01";
+  const ALL_DONE = { completed_count: 12 };
+
+  test("each row is one line: what it is, then its average and progress", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     groupsApi.listAssignments.mockResolvedValue([SET]);
     renderWith(<GroupPage />);
 
-    await screen.findByText("3 of 12 done");
-    expect(screen.getByText(/Science · Speed · Due /)).toBeTruthy();
+    // The group loads first, then its vivas: allow for both under coverage.
+    const row = await screen.findByRole(
+      "link",
+      { name: /Motion/ },
+      { timeout: 3000 },
+    );
+    expect(row.getAttribute("href")).toBe("/teach/viva?id=g1&viva=a1");
+    expect(
+      within(row).getByText(/^Science · Speed · Due .*2 Jan/),
+    ).toBeTruthy();
+    expect(within(row).getByText("6.4").textContent).toBe("6.4/10");
+    expect(within(row).getByText("3 of 12 done")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Set a viva" }).getAttribute("href"),
     ).toBe("/teach/assign?id=g1");
+  });
+
+  test("finished business moves to Completed; the rest stays Ongoing", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    groupsApi.listAssignments.mockResolvedValue([
+      // Past due and everyone done: completed.
+      {
+        ...SET,
+        assignment_id: "a1",
+        title: "Motion",
+        due_on: PAST,
+        ...ALL_DONE,
+      },
+      // Past due, someone still to do it: ongoing, and overdue.
+      { ...SET, assignment_id: "a2", title: "Force", due_on: PAST },
+      // Everyone done but no due day: stays open, so ongoing.
+      {
+        ...SET,
+        assignment_id: "a3",
+        title: "Sound",
+        due_on: null,
+        ...ALL_DONE,
+      },
+    ]);
+    const user = renderWith(<GroupPage />);
+
+    const ongoing = await screen.findByRole("tab", { name: /Ongoing/ });
+    expect(ongoing.getAttribute("aria-selected")).toBe("true");
+    expect(ongoing.textContent).toBe("Ongoing2");
+    const panel = screen.getByRole("tabpanel");
+    expect(within(panel).queryByText("Motion")).toBeNull();
+    expect(within(panel).getByText("Force")).toBeTruthy();
+    expect(within(panel).getByText("Sound")).toBeTruthy();
+    const overdue = within(panel).getByText(/^Overdue, was due /);
+    expect(overdue.className).toMatch(/text-ember-text/);
+
+    await user.click(screen.getByRole("tab", { name: /Completed/ }));
+
+    const done = screen.getByRole("tabpanel");
+    expect(within(done).getByText("Motion")).toBeTruthy();
+    expect(within(done).queryByText("Force")).toBeNull();
+  });
+
+  test("an empty pile says what belongs in it", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    groupsApi.listAssignments.mockResolvedValue([
+      { ...SET, due_on: PAST, ...ALL_DONE },
+    ]);
+    const user = renderWith(<GroupPage />);
+
+    await screen.findByText(/Nothing ongoing/);
+    await user.click(screen.getByRole("tab", { name: /Completed/ }));
+    await user.click(screen.getByRole("tab", { name: /Ongoing/ }));
+    await screen.findByText(/Nothing ongoing/);
+  });
+
+  test("a viva set for nobody yet has nothing to average", async () => {
+    groupsApi.getGroup.mockResolvedValue({ ...GROUP, member_count: 0 });
+    groupsApi.listAssignments.mockResolvedValue([
+      { ...SET, completed_count: 0, average_score: null },
+    ]);
+    renderWith(<GroupPage />);
+
+    await screen.findByText("No one joined yet");
+    expect(screen.getByLabelText("No scores yet").textContent).toBe("–");
+  });
+
+  test("Completed explains itself until something gets there", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    groupsApi.listAssignments.mockResolvedValue([SET]);
+    const user = renderWith(<GroupPage />);
+
+    await user.click(await screen.findByRole("tab", { name: /Completed/ }));
+
+    expect(
+      screen.getByText(/once their due date has passed and everyone/),
+    ).toBeTruthy();
   });
 
   test("with none set, say what setting one does", async () => {
@@ -198,45 +295,8 @@ describe("the vivas on a teacher's group page", () => {
     groupsApi.listAssignments.mockResolvedValue([]);
     renderWith(<GroupPage />);
 
-    await screen.findByText(/No vivas set yet/);
-  });
-
-  test("removing one asks first and says its reports go too", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValueOnce([SET]);
-    groupsApi.listAssignments.mockResolvedValueOnce([]);
-    groupsApi.deleteAssignment.mockResolvedValue(undefined);
-    const user = renderWith(<GroupPage />);
-
-    await user.click(await screen.findByRole("button", { name: "Remove" }));
-    expect(screen.getByText(/removes the reports/)).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Remove viva" }));
-
-    await waitFor(() =>
-      expect(groupsApi.deleteAssignment).toHaveBeenCalledWith("g1", "a1"),
-    );
-    expect(analytics.track).toHaveBeenCalledWith("assignment_removed", {
-      completed: 3,
-    });
-    await screen.findByText(/No vivas set yet/);
-  });
-
-  test("a failed removal says so; keeping it does nothing", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValue([SET]);
-    groupsApi.deleteAssignment.mockRejectedValue(failure(503));
-    const user = renderWith(<GroupPage />);
-
-    await user.click(await screen.findByRole("button", { name: "Remove" }));
-    await user.click(screen.getByRole("button", { name: "Keep" }));
-    await user.click(screen.getByRole("button", { name: "Remove" }));
-    await user.click(screen.getByRole("button", { name: "Remove viva" }));
-
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        "Couldn't remove the viva. Try again.",
-      ),
-    );
+    await screen.findByRole("heading", { name: "No vivas yet" });
+    expect(screen.getByText(/see it on their home page/)).toBeTruthy();
   });
 
   test("a failed load offers a retry", async () => {
@@ -247,7 +307,7 @@ describe("the vivas on a teacher's group page", () => {
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
-    await screen.findByText("3 of 12 done");
+    await screen.findByRole("link", { name: /Motion/ });
   });
 
   test("due days read as calendar days", () => {

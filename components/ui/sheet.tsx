@@ -6,9 +6,10 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A panel that slides in over the page. From shadcn/ui, cut down to the two
- * uses Ambrace has on a phone: the side panel from the left, and home's lists
- * of choices from the bottom, where a thumb already is.
+ * A panel that slides in over the page. From shadcn/ui, cut down to the
+ * uses Ambrace has: the side panel from the left, home's lists of choices
+ * from the bottom (where a thumb already is), and a group's secondary
+ * details from the right, beside the page they belong to.
  */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -16,6 +17,8 @@ function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
 
 const SIDES = {
   left: "inset-y-0 left-0 h-full max-w-[85vw] border-r data-open:slide-in-from-left data-closed:slide-out-to-left",
+  right:
+    "inset-y-0 right-0 h-full w-full border-l sm:max-w-md data-open:slide-in-from-right data-closed:slide-out-to-right",
   bottom:
     "inset-x-0 bottom-0 max-h-[85dvh] rounded-t-3xl border-t data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
 } as const;
@@ -63,4 +66,10 @@ function SheetDescription({
   );
 }
 
-export { Sheet, SheetContent, SheetDescription, SheetTitle };
+function SheetClose({
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Close>) {
+  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
+}
+
+export { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle };

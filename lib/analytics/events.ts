@@ -113,6 +113,10 @@ export type ProductEvents = {
     has_due_date: boolean;
   };
   assignment_removed: { completed: number };
+  /** The owner opened one viva's results. Counts only, never names or scores. */
+  assignment_results_viewed: { completed: number; students: number };
+  /** The owner opened a student's report. */
+  student_report_viewed: Record<string, never>;
   /** The owner deleted a group; `members` is how many were in it. */
   group_deleted: { members: number };
   /** A student opened an invite link; `found` is false for a dead code. */

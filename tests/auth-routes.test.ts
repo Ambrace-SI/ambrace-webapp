@@ -12,6 +12,8 @@ import {
   studentGroupPath,
   teachAssignPath,
   teachGroupPath,
+  teachReportPath,
+  teachVivaPath,
 } from "@/lib/auth/routes";
 
 describe("which pages can be seen without signing in", () => {
@@ -88,6 +90,10 @@ describe("addresses for groups", () => {
     expect(studentGroupPath("g1")).toBe("/groups/group?id=g1");
     expect(teachAssignPath("g1")).toBe("/teach/assign?id=g1");
     expect(startAssignedPath("a1")).toBe("/?assignment=a1");
+    expect(teachVivaPath("g1", "a1")).toBe("/teach/viva?id=g1&viva=a1");
+    expect(teachReportPath("g1", "a1", "s 1")).toBe(
+      "/teach/report?id=g1&viva=a1&student=s+1",
+    );
   });
 
   test("each kind of account has its own start page", () => {

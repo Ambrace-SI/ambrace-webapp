@@ -78,6 +78,7 @@ const groupsApi = vi.hoisted(() => ({
   listOwnedGroups: vi.fn(),
   createGroup: vi.fn(),
   getGroup: vi.fn(),
+  listAssignments: vi.fn(),
   renameGroup: vi.fn(),
   replaceJoinCode: vi.fn(),
   removeMember: vi.fn(),
@@ -153,6 +154,7 @@ function renderWith(ui: ReactNode, me: Me = TEACHER) {
 
 beforeEach(() => {
   Object.values(groupsApi).forEach((fn) => fn.mockReset());
+  groupsApi.listAssignments.mockResolvedValue([]);
   analytics.track.mockReset();
   toast.success.mockReset();
   toast.error.mockReset();
@@ -190,14 +192,15 @@ describe("the teacher's start page", () => {
     );
   });
 
-  test("lists each group with its class, size and code, linking to it", async () => {
+  test("lists each group with its class and size, linking to it", async () => {
     groupsApi.listOwnedGroups.mockResolvedValue([SUMMARY]);
     renderWith(<TeachHome />);
 
     const card = await screen.findByRole("link", { name: /Class 9-A/ });
     expect(card.getAttribute("href")).toBe("/teach/group?id=g1");
     expect(within(card).getByText("Class 9 · 2 students")).toBeTruthy();
-    expect(within(card).getByText("K7QX2M")).toBeTruthy();
+    // The join code lives in the group's invite panel, not on the card.
+    expect(within(card).queryByText("K7QX2M")).toBeNull();
   });
 
   test("a failed load offers a retry", async () => {
@@ -275,19 +278,52 @@ describe("creating a group", () => {
 });
 
 describe("a group's page", () => {
-  test("shows the code, the link and who has joined", async () => {
+  /** Invite, students, rename and delete live behind the ⋯ menu. */
+  async function choose(
+    user: ReturnType<typeof userEvent.setup>,
+    item: string,
+  ) {
+    await user.click(
+      await screen.findByRole("button", { name: "Group options" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: item }));
+  }
+
+  test("shows only the vivas, with everything else in the menu", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
-    renderWith(<GroupPage />);
+    const { user } = renderWith(<GroupPage />);
 
     await screen.findByRole("heading", { name: "Class 9-A" });
     expect(groupsApi.getGroup).toHaveBeenCalledWith("g1");
-    expect(screen.getByLabelText("Join code K 7 Q X 2 M")).toBeTruthy();
+    await screen.findByRole("heading", { name: "No vivas yet" });
+    expect(screen.queryByLabelText(/Join code/)).toBeNull();
+    expect(screen.queryByText("Riya Verma")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Group options" }));
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Invite students",
+      "Students2",
+      "Rename group",
+      "Delete group",
+    ]);
+  });
+
+  test("the invite panel has the code, the link and ways to share them", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    const { user } = renderWith(<GroupPage />);
+
+    await choose(user, "Invite students");
+
+    const panel = await screen.findByRole("dialog", {
+      name: "Invite students",
+    });
+    expect(within(panel).getByLabelText("Join code K 7 Q X 2 M")).toBeTruthy();
     expect(
-      screen.getByText("http://localhost:3000/join?code=K7QX2M"),
+      within(panel).getByText("http://localhost:3000/join?code=K7QX2M"),
     ).toBeTruthy();
-    expect(screen.getByText("Riya Verma")).toBeTruthy();
-    expect(screen.getByText("Aman Gupta")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Students · 2" })).toBeTruthy();
+    await user.click(within(panel).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   test("copying the link puts it on the clipboard", async () => {
@@ -297,6 +333,7 @@ describe("a group's page", () => {
       .spyOn(navigator.clipboard, "writeText")
       .mockResolvedValue(undefined);
 
+    await choose(user, "Invite students");
     await user.click(await screen.findByRole("button", { name: "Copy link" }));
 
     expect(writeText).toHaveBeenCalledWith(
@@ -315,6 +352,7 @@ describe("a group's page", () => {
       new Error("denied"),
     );
 
+    await choose(user, "Invite students");
     await user.click(await screen.findByRole("button", { name: "Copy code" }));
 
     expect(toast.error).toHaveBeenCalledWith(
@@ -324,8 +362,9 @@ describe("a group's page", () => {
 
   test("WhatsApp gets a message with the link", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
-    renderWith(<GroupPage />);
+    const { user } = renderWith(<GroupPage />);
 
+    await choose(user, "Invite students");
     const share = await screen.findByRole("link", {
       name: "Share on WhatsApp",
     });
@@ -343,6 +382,7 @@ describe("a group's page", () => {
     });
     const { user } = renderWith(<GroupPage />);
 
+    await choose(user, "Invite students");
     await user.click(
       await screen.findByRole("button", { name: /Get a new code/ }),
     );
@@ -354,26 +394,28 @@ describe("a group's page", () => {
     expect(analytics.track).toHaveBeenCalledWith("group_code_replaced");
   });
 
-  test("removing a student asks first, then takes them off the list", async () => {
+  test("the students panel lists who joined; removing one asks first", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     groupsApi.removeMember.mockResolvedValue(undefined);
     const { user } = renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Remove Riya" }),
-    );
+    await choose(user, "Students2");
+    await screen.findByRole("dialog", { name: "Students · 2" });
+    expect(screen.getByText("Aman Gupta")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Remove Riya" }));
     expect(groupsApi.removeMember).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() => expect(screen.queryByText("Riya Verma")).toBeNull());
     expect(groupsApi.removeMember).toHaveBeenCalledWith("g1", "riya");
-    expect(screen.getByRole("heading", { name: "Students · 1" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Students · 1" })).toBeTruthy();
   });
 
   test("changing one's mind keeps the student", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     const { user } = renderWith(<GroupPage />);
 
+    await choose(user, "Students2");
     await user.click(
       await screen.findByRole("button", { name: "Remove Aman" }),
     );
@@ -391,10 +433,8 @@ describe("a group's page", () => {
     });
     const { user } = renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Rename group" }),
-    );
-    const field = screen.getByLabelText("Group name");
+    await choose(user, "Rename group");
+    const field = await screen.findByLabelText("Group name");
     await user.clear(field);
     await user.type(field, "9-A Science");
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -408,10 +448,8 @@ describe("a group's page", () => {
     groupsApi.deleteGroup.mockResolvedValue(undefined);
     const { user } = renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Delete this group" }),
-    );
-    expect(screen.getByText(/can't be undone/)).toBeTruthy();
+    await choose(user, "Delete group");
+    expect(await screen.findByText(/can't be undone/)).toBeTruthy();
     expect(groupsApi.deleteGroup).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Delete group" }));
 
@@ -427,12 +465,13 @@ describe("a group's page", () => {
     groupsApi.deleteGroup.mockRejectedValue(failure(503));
     const { user } = renderWith(<GroupPage />);
 
+    await choose(user, "Delete group");
+    await user.click(await screen.findByRole("button", { name: "Keep it" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await choose(user, "Delete group");
     await user.click(
-      await screen.findByRole("button", { name: "Delete this group" }),
+      await screen.findByRole("button", { name: "Delete group" }),
     );
-    await user.click(screen.getByRole("button", { name: "Keep it" }));
-    await user.click(screen.getByRole("button", { name: "Delete this group" }));
-    await user.click(screen.getByRole("button", { name: "Delete group" }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
@@ -442,15 +481,35 @@ describe("a group's page", () => {
     expect(address.replace).not.toHaveBeenCalled();
   });
 
-  test("an empty group says how people get in", async () => {
+  test("an empty group leads with inviting, and its students panel says so", async () => {
     groupsApi.getGroup.mockResolvedValue({
       ...GROUP,
       member_count: 0,
       members: [],
     });
-    renderWith(<GroupPage />);
+    const { user } = renderWith(<GroupPage />, PARENT);
 
+    await screen.findByRole("heading", { name: "Invite your children first" });
+    await choose(user, "Children0");
     await screen.findByText(/No one has joined yet/);
+    await user.click(screen.getByRole("button", { name: "Invite children" }));
+
+    await screen.findByRole("dialog", { name: "Invite children" });
+  });
+
+  test("inviting from the empty state opens the invite panel", async () => {
+    groupsApi.getGroup.mockResolvedValue({
+      ...GROUP,
+      member_count: 0,
+      members: [],
+    });
+    const { user } = renderWith(<GroupPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Invite students" }),
+    );
+
+    await screen.findByRole("dialog", { name: "Invite students" });
   });
 
   test.each([404, 403])(

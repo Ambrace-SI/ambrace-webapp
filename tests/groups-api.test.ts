@@ -57,6 +57,18 @@ describe("the groups client calls the documented routes", () => {
       "post",
       ["/api/v1/groups/g1/assignments/a1/start"],
     ],
+    [
+      "getAssignmentResults",
+      ["g1", "a1"],
+      "get",
+      ["/api/v1/groups/g1/assignments/a1/results"],
+    ],
+    [
+      "getStudentReport",
+      ["g1", "a1", "s1"],
+      "get",
+      ["/api/v1/groups/g1/assignments/a1/results/s1"],
+    ],
   ] as const)("%s", async (name, args, method, expected) => {
     const call = groups[name] as (...a: unknown[]) => Promise<unknown>;
 

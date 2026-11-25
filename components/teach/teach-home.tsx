@@ -101,10 +101,9 @@ function GroupCard({
           aria-hidden="true"
         />
       </div>
-      <div className="mt-auto flex items-center justify-between gap-3 text-sm text-muted-foreground">
-        <span>{groupDetails(kind, group)}</span>
-        <span className="font-mono tracking-wider">{group.join_code}</span>
-      </div>
+      <p className="mt-auto text-sm text-muted-foreground">
+        {groupDetails(kind, group)}
+      </p>
     </Link>
   );
 }

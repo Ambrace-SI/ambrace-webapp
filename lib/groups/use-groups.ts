@@ -12,7 +12,9 @@ import {
   createGroup,
   deleteAssignment,
   deleteGroup,
+  getAssignmentResults,
   getGroup,
+  getStudentReport,
   joinGroup,
   leaveGroup,
   listAssigned,
@@ -24,7 +26,7 @@ import {
   renameGroup,
   replaceJoinCode,
 } from "@/lib/groups/api";
-import type { AssignmentCreate } from "@/types/assignments";
+import type { Assignment, AssignmentCreate } from "@/types/assignments";
 import type { GroupCreate, GroupDetail, GroupSummary } from "@/types/groups";
 
 export const OWNED_GROUPS_KEY = ["groups", "owned"] as const;
@@ -33,6 +35,14 @@ export const groupKey = (groupId: string) =>
   ["groups", "one", groupId] as const;
 export const assignmentsKey = (groupId: string) =>
   ["groups", "assignments", groupId] as const;
+/** Under assignmentsKey, so refreshing a group's vivas refreshes these too. */
+export const resultsKey = (groupId: string, assignmentId: string) =>
+  [...assignmentsKey(groupId), "results", assignmentId] as const;
+export const reportKey = (
+  groupId: string,
+  assignmentId: string,
+  studentId: string,
+) => [...resultsKey(groupId, assignmentId), studentId] as const;
 /** The student's set vivas. Refreshed whenever a viva ends. */
 export const ASSIGNED_KEY = ["groups", "assigned"] as const;
 
@@ -54,6 +64,14 @@ function storeSummary(queryClient: QueryClient, summary: GroupSummary) {
 
 // --------------------------------------------------------------- educator
 
+/**
+ * What changes while a teacher watches: students join and vivas get done in
+ * other people's browsers. So these are re-checked whenever the page is
+ * opened or comes back into view, and every 20 seconds while it is on screen
+ * (React Query pauses the interval in a background tab).
+ */
+const LIVE = { staleTime: 0, refetchInterval: 20_000 } as const;
+
 export function useOwnedGroups() {
   return useQuery({ queryKey: OWNED_GROUPS_KEY, queryFn: listOwnedGroups });
 }
@@ -63,6 +81,7 @@ export function useGroup(groupId: string | null) {
     queryKey: groupKey(groupId ?? ""),
     queryFn: () => getGroup(groupId as string),
     enabled: Boolean(groupId),
+    ...LIVE,
   });
 }
 
@@ -123,6 +142,8 @@ export function useRemoveMember(groupId: string) {
           : group,
       );
       void queryClient.invalidateQueries({ queryKey: OWNED_GROUPS_KEY });
+      // Their results stay, but the vivas' counts no longer include them.
+      void queryClient.invalidateQueries({ queryKey: assignmentsKey(groupId) });
     },
   });
 }
@@ -170,6 +191,7 @@ export function useGroupAssignments(groupId: string | null) {
     queryKey: assignmentsKey(groupId ?? ""),
     queryFn: () => listAssignments(groupId as string),
     enabled: Boolean(groupId),
+    ...LIVE,
   });
 }
 
@@ -178,7 +200,12 @@ export function useCreateAssignment(groupId: string) {
   return useMutation({
     mutationFn: (assignment: AssignmentCreate) =>
       createAssignment(groupId, assignment),
-    onSuccess: () => {
+    onSuccess: (created) => {
+      // Written straight in from the server's answer, so the group page the
+      // teacher lands on already lists it; the refetch only confirms.
+      queryClient.setQueryData<Assignment[]>(assignmentsKey(groupId), (list) =>
+        list ? [created, ...list] : list,
+      );
       void queryClient.invalidateQueries({ queryKey: assignmentsKey(groupId) });
     },
   });
@@ -189,12 +216,56 @@ export function useDeleteAssignment(groupId: string) {
   return useMutation({
     mutationFn: (assignmentId: string) =>
       deleteAssignment(groupId, assignmentId),
-    onSuccess: () => {
+    onSuccess: (_result, assignmentId) => {
+      // Gone from the list before the teacher is back on it.
+      queryClient.setQueryData<Assignment[]>(assignmentsKey(groupId), (list) =>
+        list?.filter((a) => a.assignment_id !== assignmentId),
+      );
+      queryClient.removeQueries({
+        queryKey: resultsKey(groupId, assignmentId),
+      });
       void queryClient.invalidateQueries({ queryKey: assignmentsKey(groupId) });
     },
   });
 }
 
 export function useAssigned() {
-  return useQuery({ queryKey: ASSIGNED_KEY, queryFn: listAssigned });
+  // A teacher may set one at any moment: checked again on every visit.
+  return useQuery({
+    queryKey: ASSIGNED_KEY,
+    queryFn: listAssigned,
+    staleTime: 0,
+  });
+}
+
+// ------------------------------------------------------ what the owner reads
+
+export function useAssignmentResults(
+  groupId: string | null,
+  assignmentId: string | null,
+) {
+  return useQuery({
+    queryKey: resultsKey(groupId ?? "", assignmentId ?? ""),
+    queryFn: () =>
+      getAssignmentResults(groupId as string, assignmentId as string),
+    enabled: Boolean(groupId && assignmentId),
+    ...LIVE,
+  });
+}
+
+export function useStudentReport(
+  groupId: string | null,
+  assignmentId: string | null,
+  studentId: string | null,
+) {
+  return useQuery({
+    queryKey: reportKey(groupId ?? "", assignmentId ?? "", studentId ?? ""),
+    queryFn: () =>
+      getStudentReport(
+        groupId as string,
+        assignmentId as string,
+        studentId as string,
+      ),
+    enabled: Boolean(groupId && assignmentId && studentId),
+  });
 }
