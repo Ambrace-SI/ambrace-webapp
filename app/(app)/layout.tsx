@@ -5,7 +5,7 @@ import { SessionGate } from "@/components/app/session-gate";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <SessionGate needs="profile">
+    <SessionGate needs="profile" audience="student">
       <AppShell>{children}</AppShell>
     </SessionGate>
   );

@@ -40,6 +40,7 @@ const ONBOARDED: Me = {
   onboarding_complete: true,
   profile: {
     name: "Asha Rao",
+    account_type: "student",
     class_level: 9,
     board: null,
     school_name: null,
@@ -64,13 +65,16 @@ function failure(status: number) {
   });
 }
 
-function renderGate(needs: "profile" | "session") {
+function renderGate(
+  needs: "profile" | "session",
+  audience?: "student" | "educator",
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   render(
     <QueryClientProvider client={client}>
-      <SessionGate needs={needs}>
+      <SessionGate needs={needs} audience={audience}>
         <p>The page</p>
       </SessionGate>
     </QueryClientProvider>,
@@ -282,4 +286,54 @@ test("what analytics is told: a session the backend refuses is forgotten on this
 
   await waitFor(() => expect(signOut).toHaveBeenCalled());
   expect(identity.forgetStudent).toHaveBeenCalledTimes(1);
+});
+
+const EDUCATOR: Me = {
+  ...ONBOARDED,
+  profile: {
+    ...ONBOARDED.profile!,
+    account_type: "teacher",
+    class_level: null,
+  },
+};
+
+test("someone without a profile who opened a link comes back to it after onboarding", async () => {
+  getMe.mockResolvedValue(NEW_STUDENT);
+  visit("/join", "?code=K7QX2M");
+
+  renderGate("profile");
+
+  await waitFor(() =>
+    expect(router.replace).toHaveBeenCalledWith(
+      "/onboarding?next=%2Fjoin%3Fcode%3DK7QX2M",
+    ),
+  );
+});
+
+test("a teacher who opens a student's page is sent to their groups", async () => {
+  getMe.mockResolvedValue(EDUCATOR);
+
+  renderGate("profile", "student");
+
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/teach"));
+  expect(screen.queryByText("The page")).toBeNull();
+});
+
+test("a student who opens a teacher's page is sent home", async () => {
+  getMe.mockResolvedValue(ONBOARDED);
+
+  renderGate("profile", "educator");
+
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+  expect(screen.queryByText("The page")).toBeNull();
+});
+
+test("each kind stays on its own side", async () => {
+  getMe.mockResolvedValue(EDUCATOR);
+
+  renderGate("profile", "educator");
+
+  await waitFor(() => expect(getMe).toHaveBeenCalled());
+  expect(screen.getByText("The page")).toBeTruthy();
+  expect(router.replace).not.toHaveBeenCalled();
 });

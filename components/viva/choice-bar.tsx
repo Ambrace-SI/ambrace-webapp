@@ -43,9 +43,14 @@ type Panel = "subject" | "chapter" | "topics";
 export function ChoiceBar({
   setup,
   starting,
+  actionLabel = "Start viva",
+  busyLabel = "Starting",
 }: {
   setup: VivaSetup;
   starting: boolean;
+  /** What the button does; a teacher setting a viva reads "Set viva". */
+  actionLabel?: string;
+  busyLabel?: string;
 }) {
   const [open, setOpen] = useState<Panel | null>(null);
   const ready = setup.catalog === "ready" && setup.subjects.length > 0;
@@ -146,10 +151,10 @@ export function ChoiceBar({
         {starting ? (
           <>
             <Loader2Icon className="animate-spin" aria-hidden="true" />
-            Starting
+            {busyLabel}
           </>
         ) : (
-          "Start viva"
+          actionLabel
         )}
       </Button>
     </div>

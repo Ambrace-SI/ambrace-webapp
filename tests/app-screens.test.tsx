@@ -29,6 +29,7 @@ vi.mock("@/lib/api/axios", () => ({
 
 const PROFILE: Profile = {
   name: "Asha Rao",
+  account_type: "student",
   class_level: 9,
   board: "STATE_BOARD",
   school_name: "Hill View School",
@@ -79,10 +80,15 @@ describe("the profile API client", () => {
     const { client, wrapper } = withQueries(me(PROFILE));
     const { result } = renderHook(() => useSaveProfile(), { wrapper });
 
-    await result.current.mutateAsync({ name: "Asha Rao", class_level: 10 });
+    await result.current.mutateAsync({
+      name: "Asha Rao",
+      account_type: "student",
+      class_level: 10,
+    });
 
     expect(api.put).toHaveBeenCalledWith("/api/v1/me", {
       name: "Asha Rao",
+      account_type: "student",
       class_level: 10,
     });
     expect(client.getQueryData(["me"])).toEqual(updated);
@@ -95,7 +101,11 @@ describe("the profile API client", () => {
     const { result } = renderHook(() => useSaveProfile(), { wrapper });
 
     await expect(
-      result.current.mutateAsync({ name: "Asha Rao", class_level: 10 }),
+      result.current.mutateAsync({
+        name: "Asha Rao",
+        account_type: "student",
+        class_level: 10,
+      }),
     ).rejects.toThrow("offline");
     expect(client.getQueryData(["me"])).toEqual(me(PROFILE));
   });

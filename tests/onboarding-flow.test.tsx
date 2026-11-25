@@ -42,6 +42,7 @@ function saved(profile: ProfileUpdate): Me {
     user_id: "user-1",
     onboarding_complete: true,
     profile: {
+      class_level: null,
       board: null,
       school_name: null,
       school_address: null,
@@ -52,7 +53,14 @@ function saved(profile: ProfileUpdate): Me {
   };
 }
 
-function renderFlow(me: Me = NEW_STUDENT) {
+/**
+ * Opens onboarding and, for someone new, answers the first question ("who is
+ * this account for?") so each test starts where it means to.
+ */
+async function renderFlow(
+  me: Me = NEW_STUDENT,
+  who: string | null = "I'm a student",
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
@@ -62,7 +70,11 @@ function renderFlow(me: Me = NEW_STUDENT) {
       <OnboardingFlow />
     </QueryClientProvider>,
   );
-  return userEvent.setup();
+  const user = userEvent.setup();
+  if (who && !me.onboarding_complete) {
+    await user.click(screen.getByRole("button", { name: new RegExp(who) }));
+  }
+  return user;
 }
 
 beforeEach(() => {
@@ -78,7 +90,7 @@ afterEach(cleanup);
 
 describe("step one: the name and the class", () => {
   test("nothing is saved until both are given, and each problem is named", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -89,7 +101,7 @@ describe("step one: the name and the class", () => {
 
   test("the name from a Google account is offered, so nobody retypes it", async () => {
     fetchUserAttributes.mockResolvedValue({ name: "Asha Rao" });
-    renderFlow();
+    await renderFlow();
 
     const name = screen.getByLabelText(
       "What should we call you?",
@@ -104,7 +116,7 @@ describe("step one: the name and the class", () => {
         deliver = resolve;
       }),
     );
-    const user = renderFlow();
+    const user = await renderFlow();
     const name = screen.getByLabelText(
       "What should we call you?",
     ) as HTMLInputElement;
@@ -117,7 +129,7 @@ describe("step one: the name and the class", () => {
   });
 
   test("continuing saves the name and class at once, then offers the extras", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.type(
       screen.getByLabelText("What should we call you?"),
@@ -129,6 +141,7 @@ describe("step one: the name and the class", () => {
     await screen.findByRole("heading", { name: "A little more, if you like" });
     expect(saveProfile).toHaveBeenCalledWith({
       name: "Asha Rao",
+      account_type: "student",
       class_level: 9,
     });
     // Finishing step one must not throw the student out before step two.
@@ -137,7 +150,7 @@ describe("step one: the name and the class", () => {
 
   test("a failed save keeps the student on the step with their answers", async () => {
     saveProfile.mockRejectedValue(new Error("offline"));
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.type(screen.getByLabelText("What should we call you?"), "Asha");
     await user.click(screen.getByRole("radio", { name: "9" }));
@@ -156,7 +169,7 @@ describe("step one: the name and the class", () => {
 
 describe("step two: the optional details", () => {
   async function reachStepTwo() {
-    const user = renderFlow();
+    const user = await renderFlow();
     await user.type(
       screen.getByLabelText("What should we call you?"),
       "Asha Rao",
@@ -187,6 +200,7 @@ describe("step two: the optional details", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(saveProfile).toHaveBeenCalledWith({
       name: "Asha Rao",
+      account_type: "student",
       class_level: 9,
       board: "ICSE",
       school_name: "Hill View School",
@@ -206,14 +220,16 @@ describe("step two: the optional details", () => {
 });
 
 test("a student who already has a profile is sent on to the app", async () => {
-  renderFlow(saved({ name: "Asha Rao", class_level: 9 }));
+  await renderFlow(
+    saved({ name: "Asha Rao", account_type: "student", class_level: 9 }),
+  );
 
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
   expect(screen.queryByLabelText("What should we call you?")).toBeNull();
 });
 
 test("the class can be chosen from the keyboard", async () => {
-  const user = renderFlow();
+  const user = await renderFlow();
 
   screen.getByRole("radio", { name: "5" }).focus();
   await user.keyboard("{ArrowRight}{ArrowRight}");
@@ -254,7 +270,7 @@ describe("details of the flow", () => {
   });
 
   test("leaving the name empty is pointed out as soon as the field is left", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.click(screen.getByLabelText("What should we call you?"));
     await user.tab();
@@ -263,7 +279,7 @@ describe("details of the flow", () => {
   });
 
   test("picking a class clears its error", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Pick your class.")).toBeTruthy();
@@ -273,15 +289,15 @@ describe("details of the flow", () => {
   });
 
   test("the step counter tells the student where they are", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
-    expect(screen.getByText("Step 1 of 2")).toBeTruthy();
+    expect(screen.getByText("Step 2 of 3")).toBeTruthy();
     await fillBasics(user);
-    expect(screen.getByText("Step 2 of 2")).toBeTruthy();
+    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
   });
 
   test("the second step greets the student by first name", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await fillBasics(user);
 
@@ -302,7 +318,7 @@ describe("details of the flow", () => {
         config: { headers: new AxiosHeaders() },
       }),
     );
-    const user = renderFlow();
+    const user = await renderFlow();
 
     await user.type(screen.getByLabelText("What should we call you?"), "Asha");
     await user.click(screen.getByRole("radio", { name: "9" }));
@@ -312,7 +328,7 @@ describe("details of the flow", () => {
   });
 
   test("the address is sent with its line breaks", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
     await fillBasics(user);
     saveProfile.mockClear();
 
@@ -329,7 +345,7 @@ describe("details of the flow", () => {
   });
 
   test("an optional detail that cannot be saved is reported and nothing is sent", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
     await fillBasics(user);
     saveProfile.mockClear();
 
@@ -346,7 +362,7 @@ describe("details of the flow", () => {
   });
 
   test("going back keeps what was already entered", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
     await fillBasics(user);
 
     await user.click(
@@ -363,7 +379,7 @@ describe("details of the flow", () => {
   });
 
   test("a failed finish keeps the student on the step", async () => {
-    const user = renderFlow();
+    const user = await renderFlow();
     await fillBasics(user);
     saveProfile.mockRejectedValue(new Error("offline"));
 
@@ -378,7 +394,7 @@ describe("what analytics is told", () => {
   beforeEach(() => analytics.track.mockClear());
 
   async function finishStepOne() {
-    const user = renderFlow();
+    const user = await renderFlow();
     await user.type(
       screen.getByLabelText("What should we call you?"),
       "Asha Rao",
@@ -393,7 +409,7 @@ describe("what analytics is told", () => {
     await finishStepOne();
 
     expect(analytics.track.mock.calls).toEqual([
-      ["onboarding_completed", { class_level: 9 }],
+      ["onboarding_completed", { account_type: "student", class_level: 9 }],
     ]);
   });
 
@@ -408,13 +424,13 @@ describe("what analytics is told", () => {
 
     expect(saveProfile).toHaveBeenCalledTimes(2);
     expect(analytics.track.mock.calls).toEqual([
-      ["onboarding_completed", { class_level: 9 }],
+      ["onboarding_completed", { account_type: "student", class_level: 9 }],
     ]);
   });
 
   test("a save that failed is not a completed onboarding", async () => {
     saveProfile.mockRejectedValue(new Error("down"));
-    const user = renderFlow();
+    const user = await renderFlow();
     await user.type(
       screen.getByLabelText("What should we call you?"),
       "Asha Rao",
@@ -454,5 +470,82 @@ describe("what analytics is told", () => {
 
     expect(screen.getByText("Asha")).toBeTruthy();
     expect(privateContentLeaks(document.body, ["Asha"])).toEqual([]);
+  });
+});
+
+describe("the first question: who the account is for", () => {
+  test("is asked before anything else, and says where to change it", async () => {
+    await renderFlow(NEW_STUDENT, null);
+
+    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+    expect(screen.getByText(/change it later in Settings/)).toBeTruthy();
+    for (const who of ["I'm a student", "I'm a teacher", "I'm a parent"]) {
+      expect(
+        screen.getByRole("button", { name: new RegExp(who) }),
+      ).toBeTruthy();
+    }
+    expect(screen.queryByLabelText("What should we call you?")).toBeNull();
+  });
+
+  test("a teacher gives only a name, and lands on their groups", async () => {
+    const user = await renderFlow(NEW_STUDENT, "I'm a teacher");
+
+    expect(screen.getByText("Step 2 of 2")).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "9" })).toBeNull();
+    await user.type(
+      screen.getByLabelText("What should we call you?"),
+      "Meera Sharma",
+    );
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/teach"));
+    expect(saveProfile).toHaveBeenCalledWith({
+      name: "Meera Sharma",
+      account_type: "teacher",
+    });
+  });
+
+  test("a parent is saved as a parent", async () => {
+    const user = await renderFlow(NEW_STUDENT, "I'm a parent");
+
+    await user.type(screen.getByLabelText("What should we call you?"), "Anita");
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveProfile.mock.calls[0][0]).toMatchObject({
+      account_type: "parent",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("onboarding_completed", {
+      account_type: "parent",
+      class_level: null,
+    });
+  });
+
+  test("going back from the name lets the choice be changed", async () => {
+    const user = await renderFlow(NEW_STUDENT, "I'm a teacher");
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: /I'm a student/ }));
+
+    expect(screen.getByRole("radio", { name: "9" })).toBeTruthy();
+  });
+
+  test("a student who arrived from an invite link goes back to it", async () => {
+    vi.stubGlobal("location", {
+      ...window.location,
+      search: "?next=%2Fjoin%3Fcode%3DK7QX2M",
+    });
+    const user = await renderFlow();
+    await user.type(screen.getByLabelText("What should we call you?"), "Riya");
+    await user.click(screen.getByRole("radio", { name: "9" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "A little more, if you like" });
+
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith("/join?code=K7QX2M"),
+    );
+    vi.unstubAllGlobals();
   });
 });

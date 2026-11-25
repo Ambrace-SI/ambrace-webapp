@@ -13,7 +13,7 @@ import {
   SettingValue,
 } from "@/components/settings/setting-rows";
 import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
-import { isSignedOutError } from "@/lib/api/errors";
+import { httpStatus, isSignedOutError } from "@/lib/api/errors";
 import { useSaveProfile } from "@/lib/hooks/use-me";
 import {
   NAME_MAX_LENGTH,
@@ -27,6 +27,8 @@ import {
   type ProfileErrors,
 } from "@/lib/onboarding/profile-form";
 import {
+  ACCOUNT_TYPES,
+  ACCOUNT_TYPE_LABELS,
   BOARDS,
   BOARD_LABELS,
   CLASS_LEVELS,
@@ -43,6 +45,10 @@ type EditorProps = {
 /** One detail of the profile: how its row reads, and how it is edited. */
 type Detail = {
   key: keyof ProfileDraft;
+  /** A teacher's or parent's classes belong to their groups, not to them. */
+  studentsOnly?: boolean;
+  /** Another field this editor also fills in, whose problems it shows. */
+  alsoChecks?: keyof ProfileErrors;
   label: string;
   description: string;
   /** The saved value as the row shows it, or null when there is none. */
@@ -65,7 +71,44 @@ const BOARD_OPTIONS = BOARDS.map((board) => ({
  * The details, in the order onboarding asked for them. To let a student edit
  * something new about themselves, add it here.
  */
+const ACCOUNT_TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({
+  value: type,
+  label: ACCOUNT_TYPE_LABELS[type],
+}));
+
 const DETAILS: Detail[] = [
+  {
+    key: "accountType",
+    alsoChecks: "classLevel",
+    label: "Account type",
+    description: "Decides whether you take vivas or set them for others.",
+    shown: (profile) => ACCOUNT_TYPE_LABELS[profile.account_type],
+    whileEditing:
+      "Teacher and parent can be swapped any time. Switching to or from student needs your groups left or deleted first.",
+    Editor: ({ draft, update, error }) => (
+      <div className="flex flex-col gap-6">
+        <ChoiceChips
+          legend="Account type"
+          options={ACCOUNT_TYPE_OPTIONS}
+          value={draft.accountType}
+          // There is always a type: pressing the chosen one keeps it.
+          onChange={(accountType) => accountType && update({ accountType })}
+          columns="grid-cols-3"
+        />
+        {/* A student needs a class; it is asked here when switching to one. */}
+        {draft.accountType === "student" ? (
+          <ChoiceChips
+            legend="Your class"
+            options={CLASS_OPTIONS}
+            value={draft.classLevel}
+            onChange={(classLevel) => update({ classLevel })}
+            error={error}
+            columns="grid-cols-4"
+          />
+        ) : null}
+      </div>
+    ),
+  },
   {
     key: "name",
     label: "Name",
@@ -87,6 +130,7 @@ const DETAILS: Detail[] = [
   },
   {
     key: "classLevel",
+    studentsOnly: true,
     label: "Class",
     description: "Decides the subjects and chapters you can choose for a viva.",
     shown: (profile) => `Class ${profile.class_level}`,
@@ -186,7 +230,10 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
   return (
     <div ref={group}>
       <SettingsGroup title="Details">
-        {DETAILS.map((detail) => {
+        {DETAILS.filter(
+          (detail) =>
+            !detail.studentsOnly || profile.account_type === "student",
+        ).map((detail) => {
           const shown = detail.shown(profile);
           const verb = shown ? "Edit" : "Add";
           const open = editing === detail.key;
@@ -251,7 +298,9 @@ function DetailEditor({
       ...validateRequired(draft),
       ...validateOptional(draft),
     };
-    const problem = problems[detail.key as keyof ProfileErrors];
+    const problem =
+      problems[detail.key as keyof ProfileErrors] ??
+      (detail.alsoChecks ? problems[detail.alsoChecks] : undefined);
     setFieldError(problem);
     setFormError(undefined);
     if (problem) return;
@@ -271,7 +320,8 @@ function DetailEditor({
       setFormError(
         isSignedOutError(error)
           ? "Your session has ended. Refresh the page to sign in again."
-          : "We couldn't save that. Check your connection and try again.",
+          : (refusalReason(error) ??
+              "We couldn't save that. Check your connection and try again."),
       );
     }
   }
@@ -293,4 +343,15 @@ function DetailEditor({
       />
     </EditForm>
   );
+}
+
+/**
+ * The server's own explanation when it refuses a change it understood, such
+ * as switching account type while still in a group. It says what to do next.
+ */
+function refusalReason(error: unknown): string | undefined {
+  if (httpStatus(error) !== 409) return undefined;
+  const detail = (error as { response?: { data?: { detail?: unknown } } })
+    .response?.data?.detail;
+  return typeof detail === "string" ? detail : undefined;
 }
