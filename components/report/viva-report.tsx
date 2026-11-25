@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowUpRightIcon, CheckIcon } from "lucide-react";
+import { ArrowUpRightIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
+import { BackLink } from "@/components/app/back-link";
 import { VivaFeedbackPrompt } from "@/components/report/viva-feedback-prompt";
 import { Button } from "@/components/ui/button";
 import { track } from "@/lib/analytics/events";
@@ -217,19 +218,7 @@ function StartAnother() {
 }
 
 function HomeLink() {
-  return (
-    <Button
-      asChild
-      variant="ghost"
-      size="touch"
-      className="-ml-3 self-start px-3"
-    >
-      <Link href={HOME_PATH}>
-        <ArrowLeftIcon aria-hidden="true" />
-        Home
-      </Link>
-    </Button>
-  );
+  return <BackLink href={HOME_PATH}>Home</BackLink>;
 }
 
 function Notice({

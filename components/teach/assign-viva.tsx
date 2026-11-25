@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { BackLink } from "@/components/app/back-link";
 import { PageNotice } from "@/components/app/page-notice";
 import { ChoiceChips } from "@/components/forms/choice-chips";
 import { FormMessage, TextField } from "@/components/forms/fields";
@@ -90,16 +90,7 @@ export function AssignViva() {
   return (
     <main className="animate-rise mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10 sm:px-10 sm:py-14">
       <header className="flex flex-col gap-4">
-        <Button
-          asChild
-          variant="ghost"
-          className="-ml-3 self-start text-muted-foreground"
-        >
-          <Link href={teachGroupPath(group.group_id)}>
-            <ArrowLeftIcon aria-hidden="true" />
-            {group.name}
-          </Link>
-        </Button>
+        <BackLink href={teachGroupPath(group.group_id)}>{group.name}</BackLink>
         <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
           Set a viva
         </h1>

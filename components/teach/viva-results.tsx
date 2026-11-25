@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeftIcon, EllipsisIcon, Trash2Icon } from "lucide-react";
+import { EllipsisIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { BackLink } from "@/components/app/back-link";
 import { PageNotice } from "@/components/app/page-notice";
 import { ReportBody } from "@/components/report/viva-report";
 import { Progress, VivaMeta } from "@/components/teach/group-page";
@@ -57,21 +58,6 @@ const DATE = new Intl.DateTimeFormat("en-IN", {
 
 /** Below this, out of 10, a score is marked out: someone to follow up with. */
 const LOW_SCORE = 5;
-
-function BackLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Button
-      asChild
-      variant="ghost"
-      className="-ml-3 self-start text-muted-foreground"
-    >
-      <Link href={href}>
-        <ArrowLeftIcon aria-hidden="true" />
-        {children}
-      </Link>
-    </Button>
-  );
-}
 
 function Outline({ label }: { label: string }) {
   return (

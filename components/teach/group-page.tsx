@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeftIcon,
   CopyIcon,
   EllipsisIcon,
   MessageCircleIcon,
@@ -18,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { BackLink } from "@/components/app/back-link";
 import { PageNotice } from "@/components/app/page-notice";
 import { RenameGroupDialog } from "@/components/teach/group-name-dialog";
 import { Button } from "@/components/ui/button";
@@ -144,16 +144,7 @@ export function GroupPage() {
   return (
     <main className="animate-rise mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-10 sm:px-10 sm:py-14">
       <header className="flex flex-col gap-4">
-        <Button
-          asChild
-          variant="ghost"
-          className="-ml-3 self-start text-muted-foreground"
-        >
-          <Link href={TEACH_PATH}>
-            <ArrowLeftIcon aria-hidden="true" />
-            Your groups
-          </Link>
-        </Button>
+        <BackLink href={TEACH_PATH}>Your groups</BackLink>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
             <p className="label-mono text-muted-foreground">
@@ -162,6 +153,13 @@ export function GroupPage() {
             <h1 className="truncate text-3xl font-light tracking-tight sm:text-4xl">
               {group.name}
             </h1>
+            <MemberNames
+              group={group}
+              kind={kind}
+              onOpen={() =>
+                setPanel(group.members.length > 0 ? "students" : "invite")
+              }
+            />
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -211,6 +209,35 @@ export function GroupPage() {
         onOpenChange={close}
       />
     </main>
+  );
+}
+
+/**
+ * Who is in the group, by name, under its title, as a chat app shows a group.
+ * One line, cut off when long; tapping it opens the full list.
+ */
+function MemberNames({
+  group,
+  kind,
+  onOpen,
+}: {
+  group: GroupDetail;
+  kind: EducatorType;
+  onOpen: () => void;
+}) {
+  const names = group.members
+    .map((member) => member.name)
+    .sort((a, b) => a.localeCompare(b));
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="min-h-11 max-w-full self-start truncate text-left text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+    >
+      {names.length > 0
+        ? names.join(", ")
+        : `No ${membersNoun(kind)} yet. Tap to invite them.`}
+    </button>
   );
 }
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowRightIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { BackLink } from "@/components/app/back-link";
 import { PageNotice } from "@/components/app/page-notice";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -199,16 +200,7 @@ export function StudentGroup() {
   return (
     <main className="animate-rise mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-10 sm:px-10 sm:py-14">
       <header className="flex flex-col gap-4">
-        <Button
-          asChild
-          variant="ghost"
-          className="-ml-3 self-start text-muted-foreground"
-        >
-          <Link href={STUDENT_GROUPS_PATH}>
-            <ArrowLeftIcon aria-hidden="true" />
-            Your groups
-          </Link>
-        </Button>
+        <BackLink href={STUDENT_GROUPS_PATH}>Your groups</BackLink>
         <p className="label-mono text-muted-foreground">{describe(group)}</p>
         <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
           {group.name}

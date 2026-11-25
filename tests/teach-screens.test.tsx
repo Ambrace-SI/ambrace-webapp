@@ -297,7 +297,6 @@ describe("a group's page", () => {
     expect(groupsApi.getGroup).toHaveBeenCalledWith("g1");
     await screen.findByRole("heading", { name: "No vivas yet" });
     expect(screen.queryByLabelText(/Join code/)).toBeNull();
-    expect(screen.queryByText("Riya Verma")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Group options" }));
     const items = await screen.findAllByRole("menuitem");
@@ -307,6 +306,34 @@ describe("a group's page", () => {
       "Rename group",
       "Delete group",
     ]);
+  });
+
+  test("names who is in the group under its title; tapping opens the list", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    const { user } = renderWith(<GroupPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Aman Gupta, Riya Verma" }),
+    );
+
+    await screen.findByRole("dialog", { name: "Students · 2" });
+  });
+
+  test("with no one in it, the line under the title invites them", async () => {
+    groupsApi.getGroup.mockResolvedValue({
+      ...GROUP,
+      member_count: 0,
+      members: [],
+    });
+    const { user } = renderWith(<GroupPage />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "No students yet. Tap to invite them.",
+      }),
+    );
+
+    await screen.findByRole("dialog", { name: "Invite students" });
   });
 
   test("the invite panel has the code, the link and ways to share them", async () => {
