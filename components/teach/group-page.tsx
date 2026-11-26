@@ -66,11 +66,7 @@ import {
   useReplaceJoinCode,
 } from "@/lib/groups/use-groups";
 import { isOverdue, localDay } from "@/lib/groups/viva-stage";
-import {
-  educatorTypeOf,
-  groupDetails,
-  membersNoun,
-} from "@/lib/groups/wording";
+import { educatorTypeOf, membersNoun } from "@/lib/groups/wording";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { useMe } from "@/lib/hooks/use-me";
 import { cn } from "@/lib/utils";
@@ -162,19 +158,14 @@ export function GroupPage() {
         </div>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="label-mono text-muted-foreground">
-              {groupDetails(kind, group)}
-            </p>
+            {group.class_level === null ? null : (
+              <p className="label-mono text-muted-foreground">
+                Class {group.class_level}
+              </p>
+            )}
             <h1 className="truncate text-3xl font-light tracking-tight sm:text-4xl">
               {group.name}
             </h1>
-            <MemberNames
-              group={group}
-              kind={kind}
-              onOpen={() =>
-                group.members.length > 0 ? setTab("students") : invite()
-              }
-            />
           </div>
           <Button
             asChild
@@ -216,33 +207,6 @@ export function GroupPage() {
         onOpenChange={close}
       />
     </main>
-  );
-}
-
-/**
- * Who is in the group, by name, under its title, as a chat app shows a group.
- * One line, cut off when long; tapping it opens the Students tab.
- */
-function MemberNames({
-  group,
-  kind,
-  onOpen,
-}: {
-  group: GroupDetail;
-  kind: EducatorType;
-  onOpen: () => void;
-}) {
-  const names = byOldest(group.members, (m) => m.joined_at).map((m) => m.name);
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="min-h-11 max-w-full self-start truncate text-left text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-    >
-      {names.length > 0
-        ? names.join(", ")
-        : `No ${membersNoun(kind)} yet. Tap to invite them.`}
-    </button>
   );
 }
 

@@ -403,37 +403,14 @@ describe("a group's page", () => {
     ).toBe("true");
   });
 
-  test("names who is in the group under its title; tapping opens Students", async () => {
+  test("the title stands alone: no head count or names under it", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
-    const { user } = renderWith(<GroupPage />);
+    renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Riya Verma, Aman Gupta" }),
-    );
-
-    expect(
-      screen
-        .getByRole("tab", { name: /Students/ })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
-    expect(screen.getByRole("button", { name: "Remove Riya" })).toBeTruthy();
-  });
-
-  test("with no one in it, the line under the title invites them", async () => {
-    groupsApi.getGroup.mockResolvedValue({
-      ...GROUP,
-      member_count: 0,
-      members: [],
-    });
-    const { user } = renderWith(<GroupPage />);
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: "No students yet. Tap to invite them.",
-      }),
-    );
-
-    await screen.findByRole("dialog", { name: "Invite students" });
+    await screen.findByRole("heading", { name: GROUP.name });
+    expect(screen.getByText("Class 9")).toBeTruthy();
+    expect(screen.queryByText(/2 students/)).toBeNull();
+    expect(screen.queryByText("Riya Verma, Aman Gupta")).toBeNull();
   });
 
   test("the invite panel has the code, the link and ways to share them", async () => {

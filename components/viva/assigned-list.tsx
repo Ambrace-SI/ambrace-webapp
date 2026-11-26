@@ -62,7 +62,7 @@ export function AssignedList({
       className="flex w-full max-w-xl flex-col gap-3 text-left"
     >
       <h2 id="assigned-heading" className="label-mono text-muted-foreground">
-        Set for you
+        Viva for you
       </h2>
       <ul className="flex flex-col gap-2">
         {shown.map((assignment) => {

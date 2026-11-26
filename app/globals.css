@@ -321,7 +321,10 @@
     [data-variant="secondary"],
     [data-variant="destructive"]
   ),
-  [data-button][data-variant="ghost"]:is(:hover, [aria-expanded="true"]) {
+  [data-button][data-variant="ghost"]:is(
+      :hover,
+      [aria-expanded="true"]:not([data-sidebar="trigger"])
+    ) {
     border-color: var(--glass-edge);
     background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
     -webkit-backdrop-filter: blur(14px) saturate(160%);
@@ -338,7 +341,7 @@
       [data-variant="secondary"],
       [data-variant="destructive"],
       [data-variant="ghost"]
-    ):is(:hover, [aria-expanded="true"]) {
+    ):is(:hover, [aria-expanded="true"]:not([data-sidebar="trigger"])) {
     border-color: var(--glass-edge-hover);
     background: linear-gradient(
       180deg,
