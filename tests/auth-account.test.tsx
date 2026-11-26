@@ -155,6 +155,7 @@ describe("a page the server sent, while React takes it over", () => {
     onboarding_complete: true,
     profile: {
       name: "Asha Rao",
+      account_type: "student",
       class_level: 9,
       board: null,
       school_name: null,

@@ -147,8 +147,8 @@ export function HistoryList({ onNavigate }: { onNavigate: () => void }) {
               Cancel
             </Button>
             <Button
+              variant="destructive"
               size="touch"
-              className="bg-destructive text-foreground hover:bg-destructive/85"
               onClick={() => deleting && confirmDelete(deleting)}
             >
               Delete

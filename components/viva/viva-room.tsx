@@ -17,13 +17,21 @@ import { trackViva, type VivaTracking } from "@/lib/analytics/viva";
 import { httpStatus } from "@/lib/api/errors";
 import { abandonViva, startVivaSession } from "@/lib/api/axios";
 import { useWholeScreen } from "@/lib/app/whole-screen";
+import { startAssignment } from "@/lib/groups/api";
+import { ASSIGNED_KEY } from "@/lib/groups/use-groups";
 import { mapVivaRequest } from "@/lib/curriculum/selection";
 import { HISTORY_KEY } from "@/lib/hooks/use-history";
 import { useMe } from "@/lib/hooks/use-me";
 import { useVivaSession } from "@/lib/hooks/useVivaSession";
 import { useVivaStore } from "@/lib/store/viva-store";
 import { describeStartError } from "@/lib/viva/start-error";
-import { SessionState, type VivaStartResponse } from "@/types/viva";
+import type { CurriculumSelection } from "@/lib/curriculum/types";
+import type { StudentAssignment } from "@/types/assignments";
+import {
+  DEFAULT_VOICE,
+  SessionState,
+  type VivaStartResponse,
+} from "@/types/viva";
 
 /** A viva the server still believes is running. */
 const IN_FLIGHT: ReadonlySet<SessionState> = new Set([
@@ -38,6 +46,8 @@ const IN_FLIGHT: ReadonlySet<SessionState> = new Set([
  */
 function refreshHistory(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
+  // A set viva that was just finished is no longer waiting.
+  void queryClient.invalidateQueries({ queryKey: ASSIGNED_KEY });
 }
 
 /**
@@ -150,7 +160,26 @@ export function VivaRoom() {
   const profile = me?.profile;
   if (!profile) return <RoomOutline />;
 
-  async function start({ selection, voiceName }: VivaChoice) {
+  /** Practice: the student chose the chapter themselves. */
+  function start({ selection, voiceName }: VivaChoice) {
+    // Name and class come from the profile, never from the form.
+    return begin(selection, voiceName, () =>
+      startVivaSession(mapVivaRequest(profile!.name, voiceName, selection)),
+    );
+  }
+
+  /** A viva a teacher or parent set: the server builds it from the assignment. */
+  function startAssigned(assignment: StudentAssignment) {
+    return begin(assignment.curriculum_selection, DEFAULT_VOICE, () =>
+      startAssignment(assignment.group_id, assignment.assignment_id),
+    );
+  }
+
+  async function begin(
+    selection: CurriculumSelection,
+    voiceName: string,
+    create: () => Promise<VivaStartResponse>,
+  ) {
     const thisVisit = visit.current;
     const stillHere = () => visit.current === thisVisit;
     const chapter = selection.chapters[0];
@@ -172,10 +201,7 @@ export function VivaRoom() {
     try {
       // Nothing from an earlier viva may leak into this one.
       session.resetSession();
-      response = await startVivaSession(
-        // Name and class come from the profile, never from the form.
-        mapVivaRequest(profile!.name, voiceName, selection),
-      );
+      response = await create();
     } catch (error) {
       track("viva_start_failed", {
         ...choice,
@@ -225,6 +251,7 @@ export function VivaRoom() {
       starting={starting}
       error={startError}
       onStart={(choice) => void start(choice)}
+      onStartAssigned={(assignment) => void startAssigned(assignment)}
     />
   );
 }
@@ -247,7 +274,7 @@ function RoomOutline() {
         </div>
       </main>
       <div className="mx-auto w-full max-w-4xl px-3 pb-4 sm:px-6 sm:pb-6">
-        <div className="h-72 animate-pulse rounded-[20px] border border-border bg-surface md:h-[4.375rem]" />
+        <div className="h-72 animate-pulse glass-card rounded-[24px] md:h-[4.375rem]" />
       </div>
     </div>
   );

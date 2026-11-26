@@ -20,7 +20,7 @@ export function SettingsGroup({
   return (
     <section className="flex flex-col gap-3">
       <h4 className="label-mono text-muted-foreground">{title}</h4>
-      <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card px-5">
+      <ul className="flex flex-col divide-y divide-border glass-card rounded-2xl px-5">
         {children}
       </ul>
     </section>

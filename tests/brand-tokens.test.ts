@@ -156,9 +156,15 @@ test("the side panel uses the shared scrollbar, not one of its own", () => {
   assert.doesNotMatch(sidebar, /scrollbar-color|scrollbar-width/);
 });
 
-test("the stylesheet has no gradients or glows", () => {
-  assert.doesNotMatch(css, /gradient\(/);
-  assert.doesNotMatch(css, /box-shadow|drop-shadow|text-shadow/);
+test("the stylesheet has no gradients or glows, except the glass design", () => {
+  // The one exception, asked for on AMBRACE-90: the glass design system.
+  // Buttons, cards, panels and fields are lit glass, so people new to apps
+  // can see what is a button and what is a surface.
+  const glass = /[^{}]*(?:\[data-button\]|\.glass-)[^{]*\{[^}]*\}/g;
+  assert.match(css, glass);
+  const rest = css.replace(glass, "");
+  assert.doesNotMatch(rest, /gradient\(/);
+  assert.doesNotMatch(rest, /box-shadow|drop-shadow|text-shadow/);
 });
 
 test("decorative motion is switched off for people who ask for less", () => {

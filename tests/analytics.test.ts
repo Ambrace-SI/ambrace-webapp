@@ -46,6 +46,7 @@ const ME: Me = {
   onboarding_complete: true,
   profile: {
     name: "Asha Rao",
+    account_type: "student",
     class_level: 9,
     board: "CBSE",
     school_name: "Hill View School",
@@ -452,6 +453,7 @@ describe("who the events belong to", () => {
       onboarding_complete: true,
       name: "Asha Rao",
       email: "asha@example.com",
+      account_type: "student",
       class_level: 9,
       board: "CBSE",
       school_name: "Hill View School",
@@ -485,6 +487,7 @@ describe("who the events belong to", () => {
       onboarding_complete: false,
       name: null,
       email: "new@example.com",
+      account_type: null,
       class_level: null,
       board: null,
       school_name: null,

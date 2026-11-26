@@ -9,16 +9,23 @@ import { Button } from "@/components/ui/button";
 import { forgetStudent, identifyStudent } from "@/lib/analytics/identity";
 import { isSignedOutError } from "@/lib/api/errors";
 import { configureAuth, getAccessToken } from "@/lib/auth/client";
-import { ONBOARDING_PATH, signInUrlFor } from "@/lib/auth/routes";
+import { homePathFor, onboardingUrlFor, signInUrlFor } from "@/lib/auth/routes";
 import { useMe } from "@/lib/hooks/use-me";
 import { useSignInAccount } from "@/lib/hooks/use-sign-in-account";
+import { sideOf, type Side } from "@/types/profile";
 
 /**
- * Decides which signed-in screen a student belongs on.
+ * Decides which signed-in screen a person belongs on.
  *
- * `needs="profile"` guards the app: a student without a profile is sent to
- * onboarding first. `needs="session"` only handles a lost session or a failed
- * request; the onboarding screen uses it and decides the rest itself.
+ * `needs="profile"` guards the app: someone without a profile is sent to
+ * onboarding first, which brings them back here afterwards. `needs="session"`
+ * only handles a lost session or a failed request; the onboarding screen uses
+ * it and decides the rest itself.
+ *
+ * `audience` says whose side of the app this is. A student who opens a
+ * teacher's page, or a teacher who opens a student's, is sent to their own
+ * start page. That is only for their convenience: the backend refuses the
+ * data anyway.
  *
  * While the profile is still loading the page underneath is rendered, not
  * replaced: each page shows its own outline of what is coming. That keeps the
@@ -31,9 +38,11 @@ import { useSignInAccount } from "@/lib/hooks/use-sign-in-account";
  */
 export function SessionGate({
   needs,
+  audience,
   children,
 }: {
   needs: "profile" | "session";
+  audience?: Side;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -48,8 +57,15 @@ export function SessionGate({
   // The backend no longer accepts a session this device still holds.
   const refused = error ? isSignedOutError(error) : false;
   const signedOut = noSession || refused;
-  const misplaced =
+  const notOnboarded =
     needs === "profile" && me !== undefined && !me.onboarding_complete;
+  const ownKind = me?.profile ? sideOf(me.profile.account_type) : undefined;
+  const wrongSide =
+    needs === "profile" &&
+    audience !== undefined &&
+    ownKind !== undefined &&
+    ownKind !== audience;
+  const misplaced = notOnboarded || wrongSide;
 
   useEffect(() => {
     let left = false;
@@ -84,8 +100,13 @@ export function SessionGate({
   }, [me, email, emailSettled]);
 
   useEffect(() => {
-    if (misplaced) router.replace(ONBOARDING_PATH);
-  }, [misplaced, router]);
+    if (notOnboarded) {
+      const { pathname, search } = window.location;
+      router.replace(onboardingUrlFor(pathname, search));
+    } else if (wrongSide && ownKind) {
+      router.replace(homePathFor(ownKind));
+    }
+  }, [notOnboarded, wrongSide, ownKind, router]);
 
   if (signedOut || misplaced) {
     return (

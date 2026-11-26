@@ -48,6 +48,7 @@ const ME: Me = {
   onboarding_complete: true,
   profile: {
     name: "Asha Rao",
+    account_type: "student",
     class_level: 9,
     board: "CBSE",
     school_name: null,
@@ -475,6 +476,7 @@ describe("changing a detail", () => {
     await waitFor(() => expect(saveProfile).toHaveBeenCalledTimes(1));
     expect(saveProfile.mock.calls[0][0]).toEqual({
       name: "Asha R",
+      account_type: "student",
       class_level: 9,
       board: "CBSE",
       school_name: null,
@@ -944,5 +946,83 @@ describe("what a recording of Settings must not show", () => {
     expect(privateContentLeaks(document.body, ["asha@example.com"])).toEqual(
       [],
     );
+  });
+});
+
+describe("the account type", () => {
+  const TEACHER: Me = {
+    ...ME,
+    profile: { ...ME.profile!, account_type: "teacher", class_level: null },
+  };
+
+  test("is shown on the profile; a teacher has no class row", () => {
+    renderSettings("profile", TEACHER);
+
+    expect(within(row("Account type")).getByText("Teacher")).toBeTruthy();
+    expect(screen.queryByText("Class", { selector: "p" })).toBeNull();
+  });
+
+  test("a teacher can become a parent in one step, with no class asked", async () => {
+    renderSettings("profile", TEACHER);
+    await press("Edit account type");
+
+    expect(screen.queryByRole("radiogroup", { name: "Your class" })).toBeNull();
+    await user().click(screen.getByRole("radio", { name: "Parent" }));
+    await press("Save");
+
+    await waitFor(() => expect(saveProfile).toHaveBeenCalledTimes(1));
+    expect(saveProfile.mock.calls[0][0]).toEqual({
+      name: "Asha Rao",
+      account_type: "parent",
+      board: "CBSE",
+      school_name: null,
+      school_address: null,
+    });
+    expect(toast).toHaveBeenCalledWith("Account type updated.");
+  });
+
+  test("becoming a student asks for the class, and it is required", async () => {
+    renderSettings("profile", TEACHER);
+    await press("Edit account type");
+
+    await user().click(screen.getByRole("radio", { name: "Student" }));
+    await press("Save");
+    expect(screen.getByText("Pick your class.")).toBeTruthy();
+    expect(saveProfile).not.toHaveBeenCalled();
+
+    await user().click(screen.getByRole("radio", { name: "10" }));
+    await press("Save");
+
+    await waitFor(() => expect(saveProfile).toHaveBeenCalledTimes(1));
+    expect(saveProfile.mock.calls[0][0]).toMatchObject({
+      account_type: "student",
+      class_level: 10,
+    });
+  });
+
+  test("a switch the server refuses shows its reason, and nothing changes", async () => {
+    const { AxiosError, AxiosHeaders } = await import("axios");
+    saveProfile.mockRejectedValue(
+      new AxiosError("refused", undefined, undefined, undefined, {
+        status: 409,
+        statusText: "",
+        data: {
+          detail:
+            "Leave your groups before switching to a teacher or parent account.",
+        },
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+      }),
+    );
+    renderSettings("profile");
+    await press("Edit account type");
+
+    await user().click(screen.getByRole("radio", { name: "Teacher" }));
+    await press("Save");
+
+    await screen.findByText(
+      "Leave your groups before switching to a teacher or parent account.",
+    );
+    expect(within(row("Account type")).getByText("Student")).toBeTruthy();
   });
 });

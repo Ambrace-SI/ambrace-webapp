@@ -38,7 +38,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         collisionPadding={12}
         className={cn(
-          "z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
+          "z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden glass-panel rounded-2xl p-1.5 text-popover-foreground duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
           className,
         )}
         {...props}
@@ -60,7 +60,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-variant={variant}
       className={cn(
-        "relative flex min-h-11 cursor-default items-center gap-3 rounded-lg px-3 text-sm outline-hidden select-none focus:bg-muted data-disabled:pointer-events-none data-disabled:opacity-50 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:[&_svg]:text-destructive [&_svg]:size-4 [&_svg]:shrink-0",
+        "relative flex min-h-11 cursor-default items-center gap-3 rounded-lg px-3 text-sm outline-hidden select-none transition-colors focus:bg-foreground/8 dark:focus:bg-foreground/12 data-disabled:pointer-events-none data-disabled:opacity-50 data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:[&_svg]:text-destructive [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
