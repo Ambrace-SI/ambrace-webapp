@@ -26,7 +26,11 @@ import {
   renameGroup,
   replaceJoinCode,
 } from "@/lib/groups/api";
-import type { Assignment, AssignmentCreate } from "@/types/assignments";
+import type {
+  Assignment,
+  AssignmentCreate,
+  StudentAssignment,
+} from "@/types/assignments";
 import type { GroupCreate, GroupDetail, GroupSummary } from "@/types/groups";
 
 export const OWNED_GROUPS_KEY = ["groups", "owned"] as const;
@@ -236,6 +240,20 @@ export function useAssigned() {
     queryFn: listAssigned,
     staleTime: 0,
   });
+}
+
+const isPending = (assignments: StudentAssignment[]) =>
+  assignments.filter((a) => a.status === "pending");
+
+/** Vivas set for the student and not done yet: what is waiting. */
+export function usePendingAssigned(): StudentAssignment[] {
+  const { data } = useQuery({
+    queryKey: ASSIGNED_KEY,
+    queryFn: listAssigned,
+    staleTime: 0,
+    select: isPending,
+  });
+  return data ?? [];
 }
 
 // ------------------------------------------------------ what the owner reads
