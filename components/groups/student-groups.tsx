@@ -7,12 +7,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { BackLink } from "@/components/app/back-link";
+import { JoinCodeDialog } from "@/components/groups/join-group";
 import { PageNotice } from "@/components/app/page-notice";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   GROUP_ID_PARAM,
-  JOIN_PATH,
   STUDENT_GROUPS_PATH,
   studentGroupPath,
   reportPath,
@@ -49,6 +49,7 @@ function describe(group: JoinedGroup): string {
  */
 export function StudentGroups() {
   const { data: groups, error, refetch, isRefetching } = useJoinedGroups();
+  const [joining, setJoining] = useState(false);
 
   if (error) {
     return (
@@ -77,13 +78,12 @@ export function StudentGroups() {
             Your groups
           </h1>
         </div>
-        <Button asChild variant="ember" size="touch">
-          <Link href={JOIN_PATH}>
-            <PlusIcon aria-hidden="true" />
-            Join a group
-          </Link>
+        <Button variant="ember" size="touch" onClick={() => setJoining(true)}>
+          <PlusIcon aria-hidden="true" />
+          Join a group
         </Button>
       </header>
+      <JoinCodeDialog open={joining} onOpenChange={setJoining} />
 
       {!groups ? (
         <div
@@ -105,7 +105,7 @@ export function StudentGroups() {
             <li key={group.group_id}>
               <Link
                 href={studentGroupPath(group.group_id)}
-                className="group flex h-full flex-col gap-6 rounded-xl border border-border bg-card p-5 transition-colors outline-none hover:border-foreground/30 focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="glass-card glass-card-link group flex h-full flex-col gap-6 rounded-2xl p-5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-lg leading-snug font-medium">
@@ -296,7 +296,7 @@ function GroupVivas({ group }: { group: JoinedGroup }) {
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
+        <ul className="glass-card flex flex-col divide-y divide-border rounded-2xl">
           {vivas.map((viva) => (
             <GroupVivaRow key={viva.assignment_id} viva={viva} />
           ))}

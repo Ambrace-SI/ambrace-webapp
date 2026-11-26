@@ -9,12 +9,13 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { AssignViva } from "@/components/teach/assign-viva";
 import { GroupPage, dueLabel } from "@/components/teach/group-page";
 import { AssignedList } from "@/components/viva/assigned-list";
+import { AssignedPanel } from "@/components/viva/assigned-panel";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
 import type { Assignment, StudentAssignment } from "@/types/assignments";
 import type { GroupDetail } from "@/types/groups";
@@ -213,10 +214,10 @@ describe("the vivas on a teacher's group page", () => {
     ).toBe("/teach/assign?id=g1");
   });
 
-  test("finished business moves to Completed; the rest stays Ongoing", async () => {
+  test("every viva is on the Vivas tab; only overdue gets colour", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     groupsApi.listAssignments.mockResolvedValue([
-      // Past due and everyone done: completed.
+      // Past due and everyone done: finished, still listed.
       {
         ...SET,
         assignment_id: "a1",
@@ -224,47 +225,20 @@ describe("the vivas on a teacher's group page", () => {
         due_on: PAST,
         ...ALL_DONE,
       },
-      // Past due, someone still to do it: ongoing, and overdue.
+      // Past due, someone still to do it: overdue.
       { ...SET, assignment_id: "a2", title: "Force", due_on: PAST },
-      // Everyone done but no due day: stays open, so ongoing.
-      {
-        ...SET,
-        assignment_id: "a3",
-        title: "Sound",
-        due_on: null,
-        ...ALL_DONE,
-      },
     ]);
-    const user = renderWith(<GroupPage />);
+    renderWith(<GroupPage />);
 
-    const ongoing = await screen.findByRole("tab", { name: /Ongoing/ });
-    expect(ongoing.getAttribute("aria-selected")).toBe("true");
-    expect(ongoing.textContent).toBe("Ongoing2");
+    const vivas = await screen.findByRole("tab", { name: /Vivas/ });
+    expect(vivas.getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(vivas.textContent).toBe("Vivas2"));
     const panel = screen.getByRole("tabpanel");
-    expect(within(panel).queryByText("Motion")).toBeNull();
+    expect(within(panel).getByText("Motion")).toBeTruthy();
     expect(within(panel).getByText("Force")).toBeTruthy();
-    expect(within(panel).getByText("Sound")).toBeTruthy();
-    const overdue = within(panel).getByText(/^Overdue, was due /);
-    expect(overdue.className).toMatch(/text-ember-text/);
-
-    await user.click(screen.getByRole("tab", { name: /Completed/ }));
-
-    const done = screen.getByRole("tabpanel");
-    expect(within(done).getByText("Motion")).toBeTruthy();
-    expect(within(done).queryByText("Force")).toBeNull();
-  });
-
-  test("an empty pile says what belongs in it", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValue([
-      { ...SET, due_on: PAST, ...ALL_DONE },
-    ]);
-    const user = renderWith(<GroupPage />);
-
-    await screen.findByText(/Nothing ongoing/);
-    await user.click(screen.getByRole("tab", { name: /Completed/ }));
-    await user.click(screen.getByRole("tab", { name: /Ongoing/ }));
-    await screen.findByText(/Nothing ongoing/);
+    const overdue = within(panel).getAllByText(/^Overdue, was due /);
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].className).toMatch(/text-ember-text/);
   });
 
   test("a viva set for nobody yet has nothing to average", async () => {
@@ -276,18 +250,6 @@ describe("the vivas on a teacher's group page", () => {
 
     await screen.findByText("No one joined yet");
     expect(screen.getByLabelText("No scores yet").textContent).toBe("–");
-  });
-
-  test("Completed explains itself until something gets there", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValue([SET]);
-    const user = renderWith(<GroupPage />);
-
-    await user.click(await screen.findByRole("tab", { name: /Completed/ }));
-
-    expect(
-      screen.getByText(/once their due date has passed and everyone/),
-    ).toBeTruthy();
   });
 
   test("with none set, say what setting one does", async () => {
@@ -415,35 +377,131 @@ describe("setting a viva", () => {
   });
 });
 
+/** Home's two places for set vivas, sharing the corner window's state. */
+function HomeVivas({
+  starting = false,
+  onStart = vi.fn(),
+}: {
+  starting?: boolean;
+  onStart?: (assignment: StudentAssignment) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <AssignedPanel
+        starting={starting}
+        onStart={onStart}
+        open={open}
+        onOpenChange={setOpen}
+      />
+      <AssignedList
+        starting={starting}
+        onStart={onStart}
+        onShowAll={() => setOpen(true)}
+      />
+    </>
+  );
+}
+
+const chapters = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    ...WAITING,
+    assignment_id: `a${i + 1}`,
+    title: `Chapter ${i + 1}`,
+  }));
+
 describe("set vivas on the student's home", () => {
-  test("list what is waiting, and start one on request", async () => {
+  test("list what is waiting on home, and start one on request", async () => {
     groupsApi.listAssigned.mockResolvedValue([
       { ...WAITING, due_on: "2099-01-02" },
       { ...WAITING, assignment_id: "a2", status: "done", title: "Force" },
     ]);
     const onStart = vi.fn();
-    const user = renderWith(
-      <AssignedList starting={false} onStart={onStart} />,
-    );
+    const user = renderWith(<HomeVivas onStart={onStart} />);
 
-    const start = await screen.findByRole("button", {
-      name: "Start Motion, set by Meera Sharma",
-    });
-    expect(screen.getByText(/Science · Meera Sharma · Due/)).toBeTruthy();
+    const list = await screen.findByRole("region", { name: "Viva for you" });
+    expect(within(list).getByText(/Science · Meera Sharma · Due/)).toBeTruthy();
     // Done ones are not waiting.
     expect(screen.queryByText("Force")).toBeNull();
-    await user.click(start);
+    // The corner window stays closed until asked for.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(
+      within(list).getByRole("button", {
+        name: "Start Motion, set by Meera Sharma",
+      }),
+    );
 
     expect(onStart).toHaveBeenCalledWith(
       expect.objectContaining({ assignment_id: "a1" }),
     );
   });
 
+  test("the corner button counts them and opens every one in a floating window", async () => {
+    groupsApi.listAssigned.mockResolvedValue(chapters(5));
+    const onStart = vi.fn();
+    const user = renderWith(<HomeVivas onStart={onStart} />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Viva for you, 5 vivas waiting",
+      }),
+    );
+    const window = await screen.findByRole("dialog", { name: "Viva for you" });
+    const starts = within(window).getAllByRole("button", { name: /^Start/ });
+    expect(starts.map((button) => button.getAttribute("aria-label"))).toEqual(
+      [1, 2, 3, 4, 5].map((n) => `Start Chapter ${n}, set by Meera Sharma`),
+    );
+
+    await user.click(starts[4]);
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ assignment_id: "a5" }),
+    );
+    // Starting closes the window.
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  test("home shows three, always the one asked for, and the rest open the window", async () => {
+    address.search = "assignment=a5";
+    Element.prototype.scrollIntoView = vi.fn();
+    groupsApi.listAssigned.mockResolvedValue(chapters(5));
+    const user = renderWith(<HomeVivas />);
+
+    const list = await screen.findByRole("region", { name: "Viva for you" });
+    await within(list).findByText("Chapter 5");
+    expect(within(list).getByText("Chapter 1")).toBeTruthy();
+    expect(within(list).queryByText("Chapter 3")).toBeNull();
+    expect(list.querySelector("[aria-current]")?.textContent).toContain(
+      "Chapter 5",
+    );
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+
+    await user.click(
+      within(list).getByRole("button", { name: "2 more: see all 5" }),
+    );
+    const window = await screen.findByRole("dialog", { name: "Viva for you" });
+    expect(within(window).getByText("Chapter 3")).toBeTruthy();
+  });
+
+  test("closing the window leaves the button, which opens it again", async () => {
+    groupsApi.listAssigned.mockResolvedValue([WAITING]);
+    const user = renderWith(<HomeVivas />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /1 viva waiting/ }),
+    );
+    await screen.findByRole("dialog", { name: "Viva for you" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await user.click(screen.getByRole("button", { name: /1 viva waiting/ }));
+    await screen.findByRole("dialog", { name: "Viva for you" });
+  });
+
   test("show nothing when nothing is waiting", async () => {
     groupsApi.listAssigned.mockResolvedValue([]);
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
-        <AssignedList starting={false} onStart={vi.fn()} />
+        <HomeVivas />
       </QueryClientProvider>,
     );
 
@@ -451,30 +509,9 @@ describe("set vivas on the student's home", () => {
     expect(container.textContent).toBe("");
   });
 
-  test("show three, point to the rest, and always include the one asked for", async () => {
-    address.search = "assignment=a5";
-    Element.prototype.scrollIntoView = vi.fn();
-    groupsApi.listAssigned.mockResolvedValue(
-      [1, 2, 3, 4, 5].map((n) => ({
-        ...WAITING,
-        assignment_id: `a${n}`,
-        title: `Chapter ${n}`,
-      })),
-    );
-    renderWith(<AssignedList starting={false} onStart={vi.fn()} />);
-
-    await screen.findByText("Chapter 5");
-    expect(screen.getByText("Chapter 1")).toBeTruthy();
-    expect(screen.queryByText("Chapter 3")).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "2 more in Your groups" }),
-    ).toBeTruthy();
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-  });
-
   test("cannot be started twice while one is starting", async () => {
     groupsApi.listAssigned.mockResolvedValue([WAITING]);
-    renderWith(<AssignedList starting onStart={vi.fn()} />);
+    renderWith(<HomeVivas starting />);
 
     const start = await screen.findByRole("button", { name: /Start Motion/ });
     expect((start as HTMLButtonElement).disabled).toBe(true);

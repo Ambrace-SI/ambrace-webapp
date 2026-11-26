@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -20,6 +21,7 @@ import { TeachSidebar } from "@/components/teach/teach-sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { newGroupDialog } from "@/lib/groups/new-group-dialog";
+import type { Assignment } from "@/types/assignments";
 import type { GroupDetail, GroupSummary } from "@/types/groups";
 import type { Me } from "@/types/profile";
 
@@ -131,6 +133,22 @@ const GROUP: GroupDetail = {
       joined_at: "2026-11-24T10:05:00Z",
     },
   ],
+};
+const ASSIGNMENT: Assignment = {
+  assignment_id: "a1",
+  title: "Motion",
+  curriculum_selection: {
+    catalog_id: "ncert-cbse",
+    catalog_version: "v1",
+    class_level: 9,
+    subject_id: "science",
+    subject_name: "Science",
+    chapters: [{ id: "motion", name: "Motion", topics: [] }],
+  },
+  due_on: null,
+  created_at: "2026-11-24T10:00:00Z",
+  completed_count: 0,
+  average_score: null,
 };
 
 function failure(status: number) {
@@ -278,7 +296,7 @@ describe("creating a group", () => {
 });
 
 describe("a group's page", () => {
-  /** Invite, students, rename and delete live behind the ⋯ menu. */
+  /** Invite, rename and delete live behind the ⋯ menu. */
   async function choose(
     user: ReturnType<typeof userEvent.setup>,
     item: string,
@@ -289,51 +307,110 @@ describe("a group's page", () => {
     await user.click(await screen.findByRole("menuitem", { name: item }));
   }
 
-  test("shows only the vivas, with everything else in the menu", async () => {
+  async function openTab(
+    user: ReturnType<typeof userEvent.setup>,
+    name: RegExp,
+  ) {
+    await user.click(await screen.findByRole("tab", { name }));
+  }
+
+  test("opens on the Vivas tab, with Students one tab away", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     const { user } = renderWith(<GroupPage />);
 
     await screen.findByRole("heading", { name: "Class 9-A" });
     expect(groupsApi.getGroup).toHaveBeenCalledWith("g1");
     await screen.findByRole("heading", { name: "No vivas yet" });
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Vivas0", "Students2"]);
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByLabelText(/Join code/)).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Group options" }));
     const items = await screen.findAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "Invite students",
-      "Students2",
       "Rename group",
       "Delete group",
     ]);
   });
 
-  test("names who is in the group under its title; tapping opens the list", async () => {
+  test("vivas and students are listed in the order they were set or joined", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    groupsApi.listAssignments.mockResolvedValue([
+      {
+        ...ASSIGNMENT,
+        assignment_id: "a2",
+        title: "Later",
+        created_at: "2026-11-25T09:00:00Z",
+      },
+      {
+        ...ASSIGNMENT,
+        assignment_id: "a1",
+        title: "Earlier",
+        created_at: "2026-11-24T09:00:00Z",
+      },
+    ]);
+    const { user } = renderWith(<GroupPage />);
+
+    await screen.findByText("Later");
+    const vivas = screen
+      .getAllByRole("link")
+      .filter((link) =>
+        ["Earlier", "Later"].some((title) => link.textContent?.includes(title)),
+      );
+    expect(
+      vivas.map((link) => link.textContent?.startsWith("Earlier")),
+    ).toEqual([true, false]);
+
+    await openTab(user, /Students/);
+    const names = screen.getAllByText(/^(Riya Verma|Aman Gupta)$/);
+    expect(names.map((name) => name.textContent)).toEqual([
+      "Riya Verma",
+      "Aman Gupta",
+    ]);
+  });
+
+  test("arrow keys and a sideways swipe move between the tabs", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     const { user } = renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "Aman Gupta, Riya Verma" }),
-    );
+    (await screen.findByRole("tab", { name: /Vivas/ })).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(
+      screen
+        .getByRole("tab", { name: /Students/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
 
-    await screen.findByRole("dialog", { name: "Students · 2" });
+    const panel = screen.getByRole("tabpanel");
+    fireEvent.touchStart(panel, { touches: [{ clientX: 50, clientY: 100 }] });
+    fireEvent.touchEnd(panel, {
+      changedTouches: [{ clientX: 200, clientY: 110 }],
+    });
+    expect(
+      screen.getByRole("tab", { name: /Vivas/ }).getAttribute("aria-selected"),
+    ).toBe("true");
+
+    // Mostly downward is a scroll, not a swipe.
+    const vivas = screen.getByRole("tabpanel");
+    fireEvent.touchStart(vivas, { touches: [{ clientX: 200, clientY: 100 }] });
+    fireEvent.touchEnd(vivas, {
+      changedTouches: [{ clientX: 120, clientY: 300 }],
+    });
+    expect(
+      screen.getByRole("tab", { name: /Vivas/ }).getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
-  test("with no one in it, the line under the title invites them", async () => {
-    groupsApi.getGroup.mockResolvedValue({
-      ...GROUP,
-      member_count: 0,
-      members: [],
-    });
-    const { user } = renderWith(<GroupPage />);
+  test("the title stands alone: no head count or names under it", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    renderWith(<GroupPage />);
 
-    await user.click(
-      await screen.findByRole("button", {
-        name: "No students yet. Tap to invite them.",
-      }),
-    );
-
-    await screen.findByRole("dialog", { name: "Invite students" });
+    await screen.findByRole("heading", { name: GROUP.name });
+    expect(screen.getByText("Class 9")).toBeTruthy();
+    expect(screen.queryByText(/2 students/)).toBeNull();
+    expect(screen.queryByText("Riya Verma, Aman Gupta")).toBeNull();
   });
 
   test("the invite panel has the code, the link and ways to share them", async () => {
@@ -421,13 +498,12 @@ describe("a group's page", () => {
     expect(analytics.track).toHaveBeenCalledWith("group_code_replaced");
   });
 
-  test("the students panel lists who joined; removing one asks first", async () => {
+  test("the Students tab lists who joined; removing one asks first", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     groupsApi.removeMember.mockResolvedValue(undefined);
     const { user } = renderWith(<GroupPage />);
 
-    await choose(user, "Students2");
-    await screen.findByRole("dialog", { name: "Students · 2" });
+    await openTab(user, /Students/);
     expect(screen.getByText("Aman Gupta")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Remove Riya" }));
     expect(groupsApi.removeMember).not.toHaveBeenCalled();
@@ -435,14 +511,16 @@ describe("a group's page", () => {
 
     await waitFor(() => expect(screen.queryByText("Riya Verma")).toBeNull());
     expect(groupsApi.removeMember).toHaveBeenCalledWith("g1", "riya");
-    expect(screen.getByRole("dialog", { name: "Students · 1" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Students/ }).textContent).toBe(
+      "Students1",
+    );
   });
 
   test("changing one's mind keeps the student", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     const { user } = renderWith(<GroupPage />);
 
-    await choose(user, "Students2");
+    await openTab(user, /Students/);
     await user.click(
       await screen.findByRole("button", { name: "Remove Aman" }),
     );
@@ -508,7 +586,17 @@ describe("a group's page", () => {
     expect(address.replace).not.toHaveBeenCalled();
   });
 
-  test("an empty group leads with inviting, and its students panel says so", async () => {
+  test("the Students tab has its own invite button", async () => {
+    groupsApi.getGroup.mockResolvedValue(GROUP);
+    const { user } = renderWith(<GroupPage />);
+
+    await openTab(user, /Students/);
+    await user.click(screen.getByRole("button", { name: "Invite students" }));
+
+    await screen.findByRole("dialog", { name: "Invite students" });
+  });
+
+  test("an empty group leads with inviting, and its Children tab says so", async () => {
     groupsApi.getGroup.mockResolvedValue({
       ...GROUP,
       member_count: 0,
@@ -517,8 +605,8 @@ describe("a group's page", () => {
     const { user } = renderWith(<GroupPage />, PARENT);
 
     await screen.findByRole("heading", { name: "Invite your children first" });
-    await choose(user, "Children0");
-    await screen.findByText(/No one has joined yet/);
+    await openTab(user, /Children/);
+    await screen.findByRole("heading", { name: "No children yet" });
     await user.click(screen.getByRole("button", { name: "Invite children" }));
 
     await screen.findByRole("dialog", { name: "Invite children" });

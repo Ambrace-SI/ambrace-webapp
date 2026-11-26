@@ -8,6 +8,7 @@ import type { ComponentType } from "react";
 import { AccountSettings } from "@/components/settings/account/account-settings";
 import { AppearanceSettings } from "@/components/settings/appearance/appearance-settings";
 import { ProfileSettings } from "@/components/settings/profile/profile-settings";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -141,11 +142,15 @@ export function SettingsWindow() {
           </Tabs.Root>
         ) : null}
 
-        <DialogClose
-          aria-label="Close settings"
-          className="absolute top-3 right-3 flex size-11 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <XIcon className="size-5" aria-hidden="true" />
+        <DialogClose asChild>
+          <Button
+            variant="glass"
+            size="icon-touch"
+            aria-label="Close settings"
+            className="absolute top-3 right-3"
+          >
+            <XIcon aria-hidden="true" strokeWidth={2.5} />
+          </Button>
         </DialogClose>
       </DialogContent>
     </Dialog>

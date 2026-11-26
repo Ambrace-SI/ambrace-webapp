@@ -66,7 +66,7 @@ export function ChoiceBar({
   });
 
   return (
-    <div className="flex flex-col rounded-[20px] border border-border bg-surface p-2 md:flex-row md:items-center md:gap-1">
+    <div className="glass-card flex flex-col rounded-[24px] p-2 md:flex-row md:items-center md:gap-1">
       <Choice
         label="Subject"
         value={
@@ -140,10 +140,10 @@ export function ChoiceBar({
         variant="ember"
         size="touch"
         className={cn(
-          "mt-2 h-13 rounded-[14px] md:mt-0 md:ml-1",
+          "mt-2 h-13 md:mt-0 md:ml-1",
           // Nothing to start yet: a quiet button, so Ember stays rare.
           !setup.resolved &&
-            "disabled:bg-surface-active disabled:text-muted-foreground disabled:opacity-100",
+            "disabled:text-muted-foreground disabled:opacity-100",
         )}
         disabled={!setup.resolved || starting}
         aria-busy={starting}
@@ -247,7 +247,7 @@ function Choice({
             side="bottom"
             aria-describedby={undefined}
             onCloseAutoFocus={onCloseAutoFocus}
-            className="gap-3 bg-surface px-3 pt-3 pb-6 text-base shadow-none"
+            className="gap-3 rounded-t-3xl px-3 pt-3 pb-6 text-base"
           >
             <span
               aria-hidden="true"
@@ -274,7 +274,7 @@ function Choice({
         sideOffset={10}
         onCloseAutoFocus={onCloseAutoFocus}
         className={cn(
-          "max-h-[min(30rem,var(--radix-popover-content-available-height))] gap-0 overflow-hidden rounded-2xl border border-border bg-surface p-0 text-base text-foreground shadow-none ring-0",
+          "max-h-[min(30rem,var(--radix-popover-content-available-height))] gap-0 overflow-hidden rounded-2xl p-0 text-base text-foreground",
           panelClassName,
         )}
       >

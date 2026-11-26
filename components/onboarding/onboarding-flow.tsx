@@ -500,7 +500,7 @@ function WhoStep({
                 type="button"
                 aria-pressed={selected}
                 onClick={() => onChoose(who)}
-                className="flex min-h-16 w-full items-center gap-4 rounded-xl border border-border bg-card px-4 py-4 text-left transition-colors outline-none hover:border-foreground/30 focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:border-foreground"
+                className="glass-card glass-card-link flex min-h-16 w-full items-center gap-4 rounded-2xl px-4 py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:border-foreground"
               >
                 <Icon
                   className="size-6 shrink-0 text-muted-foreground"

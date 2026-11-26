@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ClipboardListIcon,
   CopyIcon,
   EllipsisIcon,
   MessageCircleIcon,
@@ -14,7 +15,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type TouchEvent,
+} from "react";
 import { toast } from "sonner";
 
 import { BackLink } from "@/components/app/back-link";
@@ -58,12 +65,8 @@ import {
   useRemoveMember,
   useReplaceJoinCode,
 } from "@/lib/groups/use-groups";
-import { isOverdue, localDay, vivaStage } from "@/lib/groups/viva-stage";
-import {
-  educatorTypeOf,
-  groupDetails,
-  membersNoun,
-} from "@/lib/groups/wording";
+import { isOverdue, localDay } from "@/lib/groups/viva-stage";
+import { educatorTypeOf, membersNoun } from "@/lib/groups/wording";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { useMe } from "@/lib/hooks/use-me";
 import { cn } from "@/lib/utils";
@@ -89,14 +92,17 @@ export function dueLabel(dueOn: string | null): string {
   return `Due ${DUE.format(new Date(year, month - 1, day))}`;
 }
 
-type Panel = "invite" | "students" | "rename" | "delete" | null;
+type Panel = "invite" | "rename" | "delete" | null;
+type Tab = "vivas" | "students";
+
+/** Oldest first: the order things were set or joined in. */
+function byOldest<T>(items: T[], at: (item: T) => string): T[] {
+  return [...items].sort((a, b) => at(a).localeCompare(at(b)));
+}
 
 /**
- * One group: its vivas, and nothing else on the page.
- *
- * What a teacher comes back for is how each viva is going, so that is all
- * the page shows. Inviting, the student list, renaming and deleting are
- * one tap away in the menu, and open over the page rather than crowding it.
+ * One group, in two tabs: its vivas and its students. Setting a viva is the
+ * one main action; renaming and deleting sit in the menu.
  */
 export function GroupPage() {
   const groupId = useSearchParams().get(GROUP_ID_PARAM);
@@ -104,6 +110,7 @@ export function GroupPage() {
   const { data: group, error, refetch, isRefetching } = useGroup(groupId);
   const kind = educatorTypeOf(me?.profile);
   const [panel, setPanel] = useState<Panel>(null);
+  const [tab, setTab] = useState<Tab>("vivas");
 
   if (!groupId || (error && [403, 404, 422].includes(httpStatus(error) ?? 0))) {
     return (
@@ -140,47 +147,45 @@ export function GroupPage() {
   const close = (open: boolean) => {
     if (!open) setPanel(null);
   };
+  const invite = () => setPanel("invite");
 
   return (
     <main className="animate-rise mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-10 sm:px-10 sm:py-14">
-      <header className="flex flex-col gap-4">
-        <BackLink href={TEACH_PATH}>Your groups</BackLink>
+      <header className="flex flex-col gap-5">
+        <div className="flex items-center justify-between gap-3">
+          <BackLink href={TEACH_PATH}>Your groups</BackLink>
+          <GroupMenu kind={kind} onOpen={setPanel} />
+        </div>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="label-mono text-muted-foreground">
-              {groupDetails(kind, group)}
-            </p>
+            {group.class_level === null ? null : (
+              <p className="label-mono text-muted-foreground">
+                Class {group.class_level}
+              </p>
+            )}
             <h1 className="truncate text-3xl font-light tracking-tight sm:text-4xl">
               {group.name}
             </h1>
-            <MemberNames
-              group={group}
-              kind={kind}
-              onOpen={() =>
-                setPanel(group.members.length > 0 ? "students" : "invite")
-              }
-            />
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant={group.member_count > 0 ? "ember" : "outline"}
-              size="touch"
-            >
-              <Link href={teachAssignPath(group.group_id)}>
-                <PlusIcon aria-hidden="true" />
-                Set a viva
-              </Link>
-            </Button>
-            <GroupMenu group={group} kind={kind} onOpen={setPanel} />
-          </div>
+          <Button
+            asChild
+            variant={group.member_count > 0 ? "ember" : "outline"}
+            size="touch"
+          >
+            <Link href={teachAssignPath(group.group_id)}>
+              <PlusIcon aria-hidden="true" />
+              Set a viva
+            </Link>
+          </Button>
         </div>
       </header>
 
-      <VivaBoard
+      <GroupTabs
         group={group}
         kind={kind}
-        onInvite={() => setPanel("invite")}
+        tab={tab}
+        onTab={setTab}
+        onInvite={invite}
       />
 
       <InviteSheet
@@ -188,13 +193,6 @@ export function GroupPage() {
         kind={kind}
         open={panel === "invite"}
         onOpenChange={close}
-      />
-      <StudentsSheet
-        group={group}
-        kind={kind}
-        open={panel === "students"}
-        onOpenChange={close}
-        onInvite={() => setPanel("invite")}
       />
       <RenameGroupDialog
         groupId={group.group_id}
@@ -212,62 +210,24 @@ export function GroupPage() {
   );
 }
 
-/**
- * Who is in the group, by name, under its title, as a chat app shows a group.
- * One line, cut off when long; tapping it opens the full list.
- */
-function MemberNames({
-  group,
-  kind,
-  onOpen,
-}: {
-  group: GroupDetail;
-  kind: EducatorType;
-  onOpen: () => void;
-}) {
-  const names = group.members
-    .map((member) => member.name)
-    .sort((a, b) => a.localeCompare(b));
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="min-h-11 max-w-full self-start truncate text-left text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-    >
-      {names.length > 0
-        ? names.join(", ")
-        : `No ${membersNoun(kind)} yet. Tap to invite them.`}
-    </button>
-  );
-}
-
 function GroupMenu({
-  group,
   kind,
   onOpen,
 }: {
-  group: GroupDetail;
   kind: EducatorType;
   onOpen: (panel: Panel) => void;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon-touch" aria-label="Group options">
-          <EllipsisIcon aria-hidden="true" />
+        <Button variant="glass" size="icon-touch" aria-label="Group options">
+          <EllipsisIcon aria-hidden="true" strokeWidth={2.5} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onOpen("invite")}>
           <UserPlusIcon aria-hidden="true" />
           Invite {membersNoun(kind)}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onOpen("students")}>
-          <UsersIcon aria-hidden="true" />
-          {kind === "parent" ? "Children" : "Students"}
-          <span className="ml-auto font-mono text-muted-foreground">
-            {group.member_count}
-          </span>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onOpen("rename")}>
           <PencilIcon aria-hidden="true" />
@@ -285,13 +245,140 @@ function GroupMenu({
   );
 }
 
-// ------------------------------------------------------------------ vivas
+// ------------------------------------------------------------------- tabs
+
+/** A sideways swipe at least this long, and mostly sideways, changes tab. */
+const SWIPE_PX = 60;
 
 /**
- * The group's vivas in two piles: ongoing ones still need something, and
- * completed ones are finished business. Each row says how far along it is.
+ * Vivas and Students as two big tabs, each with its count. On a phone a
+ * sideways swipe on the list moves between them too; arrow keys do the same
+ * from the keyboard.
  */
-function VivaBoard({
+function GroupTabs({
+  group,
+  kind,
+  tab,
+  onTab,
+  onInvite,
+}: {
+  group: GroupDetail;
+  kind: EducatorType;
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  onInvite: () => void;
+}) {
+  const { data: assignments } = useGroupAssignments(group.group_id);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const tabs: { id: Tab; label: string; icon: ReactNode; count?: number }[] = [
+    {
+      id: "vivas",
+      label: "Vivas",
+      icon: <ClipboardListIcon aria-hidden="true" />,
+      count: assignments?.length,
+    },
+    {
+      id: "students",
+      label: kind === "parent" ? "Children" : "Students",
+      icon: <UsersIcon aria-hidden="true" />,
+      count: group.member_count,
+    },
+  ];
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next: Tab = tab === "vivas" ? "students" : "vivas";
+    onTab(next);
+    document.getElementById(`tab-${next}`)?.focus();
+  }
+
+  function onTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const from = start.current;
+    start.current = null;
+    const touch = event.changedTouches[0];
+    if (!from || !touch) return;
+    const dx = touch.clientX - from.x;
+    const dy = touch.clientY - from.y;
+    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    onTab(dx < 0 ? "students" : "vivas");
+  }
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div
+        role="tablist"
+        aria-label="Group"
+        onKeyDown={onKeyDown}
+        className="grid grid-cols-2 gap-1 rounded-full border border-foreground/10 bg-muted/70 p-1 sm:max-w-sm"
+      >
+        {tabs.map(({ id, label, icon, count }) => {
+          const selected = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`tab-${id}`}
+              aria-selected={selected}
+              aria-controls={`panel-${id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onTab(id)}
+              className={cn(
+                "flex h-11 items-center justify-center gap-2 rounded-full px-4 text-base transition-[background-color,color,box-shadow] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&_svg]:size-4.5",
+                selected
+                  ? "glass-card font-semibold text-foreground"
+                  : "border border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {icon}
+              {label}
+              {count === undefined ? null : (
+                <span
+                  className={cn(
+                    "min-w-6 rounded-full px-1.5 font-mono text-xs leading-5",
+                    selected
+                      ? "bg-foreground text-background"
+                      : "bg-foreground/10",
+                  )}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        key={tab}
+        id={`panel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${tab}`}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          start.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+        }}
+        onTouchEnd={onTouchEnd}
+        className={cn(
+          "animate-in duration-300 fade-in-0 motion-reduce:animate-none",
+          tab === "vivas" ? "slide-in-from-left-3" : "slide-in-from-right-3",
+        )}
+      >
+        {tab === "vivas" ? (
+          <VivaList group={group} kind={kind} onInvite={onInvite} />
+        ) : (
+          <StudentList group={group} kind={kind} onInvite={onInvite} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------ vivas
+
+/** Every viva set in the group, the first one set at the top. */
+function VivaList({
   group,
   kind,
   onInvite,
@@ -305,7 +392,6 @@ function VivaBoard({
     error,
     refetch,
   } = useGroupAssignments(group.group_id);
-  const [tab, setTab] = useState<"ongoing" | "completed">("ongoing");
 
   if (error) {
     return (
@@ -326,9 +412,8 @@ function VivaBoard({
         role="status"
         aria-label="Loading the vivas"
       >
-        <Skeleton className="h-11 w-64 rounded-lg" />
-        <Skeleton className="h-28 rounded-xl" />
-        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-16 rounded-xl" />
+        <Skeleton className="h-16 rounded-xl" />
       </div>
     );
   }
@@ -362,69 +447,69 @@ function VivaBoard({
   }
 
   const today = localDay();
-  const piles = {
-    ongoing: assignments.filter(
-      (a) => vivaStage(a, group.member_count, today) === "ongoing",
-    ),
-    completed: assignments.filter(
-      (a) => vivaStage(a, group.member_count, today) === "completed",
-    ),
-  };
-  const shown = piles[tab];
-
   return (
-    <section aria-label="Vivas" className="flex flex-col gap-4">
-      <div
-        role="tablist"
-        aria-label="Vivas"
-        className="inline-flex self-start rounded-xl bg-muted/70 p-1"
-      >
-        {(["ongoing", "completed"] as const).map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            id={`tab-${name}`}
-            aria-selected={tab === name}
-            aria-controls="viva-list"
-            onClick={() => setTab(name)}
-            className={cn(
-              "flex h-10 items-center gap-2 rounded-lg px-4 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-              tab === name
-                ? "bg-card font-medium text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {name === "ongoing" ? "Ongoing" : "Completed"}
-            <span className="font-mono text-xs text-muted-foreground">
-              {piles[name].length}
-            </span>
-          </button>
-        ))}
-      </div>
+    <ul className="glass-card flex flex-col gap-0.5 rounded-2xl p-1.5">
+      {byOldest(assignments, (a) => a.created_at).map((assignment) => (
+        <li key={assignment.assignment_id}>
+          <VivaRow
+            group={group}
+            assignment={assignment}
+            overdue={isOverdue(assignment, group.member_count, today)}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-      <div id="viva-list" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {shown.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
-            {tab === "ongoing"
-              ? "Nothing ongoing. Every viva set here is complete."
-              : "Vivas move here once their due date has passed and everyone has done them."}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-0.5 rounded-xl border border-border bg-card p-1.5">
-            {shown.map((assignment) => (
-              <li key={assignment.assignment_id}>
-                <VivaRow
-                  group={group}
-                  assignment={assignment}
-                  overdue={isOverdue(assignment, group.member_count, today)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+// --------------------------------------------------------------- students
+
+/** Everyone who joined, the first to join at the top, with a way to invite more. */
+function StudentList({
+  group,
+  kind,
+  onInvite,
+}: {
+  group: GroupDetail;
+  kind: EducatorType;
+  onInvite: () => void;
+}) {
+  const noun = membersNoun(kind);
+  if (group.members.length === 0) {
+    return (
+      <EmptyState
+        title={`No ${noun} yet`}
+        body="Share the link or code. Joining is their choice, and once they're in, the vivas you set appear on their home page."
+        action={
+          <Button variant="ember" size="touch" onClick={onInvite}>
+            <UserPlusIcon aria-hidden="true" />
+            Invite {noun}
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Everyone who joined with your link or code.
+        </p>
+        <Button variant="outline" size="touch" onClick={onInvite}>
+          <UserPlusIcon aria-hidden="true" />
+          Invite {noun}
+        </Button>
       </div>
-    </section>
+      <ul className="glass-card flex flex-col divide-y divide-border rounded-2xl">
+        {byOldest(group.members, (m) => m.joined_at).map((member) => (
+          <MemberRow
+            key={member.student_id}
+            groupId={group.group_id}
+            member={member}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -438,7 +523,7 @@ function EmptyState({
   action: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed border-border p-6 sm:p-8">
+    <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-border p-6 sm:p-8">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-medium">{title}</h2>
         <p className="max-w-md text-muted-foreground">{body}</p>
@@ -577,8 +662,8 @@ function SidePanel({
             </SheetDescription>
           </div>
           <SheetClose asChild>
-            <Button variant="ghost" size="icon-touch" aria-label="Close">
-              <XIcon aria-hidden="true" />
+            <Button variant="glass" size="icon-touch" aria-label="Close">
+              <XIcon aria-hidden="true" strokeWidth={2.5} />
             </Button>
           </SheetClose>
         </div>
@@ -648,7 +733,7 @@ function InviteSheet({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+      <div className="glass-card flex flex-col gap-3 rounded-2xl p-5">
         <p className="label-mono text-muted-foreground">Join code</p>
         <p
           className="font-mono text-4xl font-medium tracking-[0.2em]"
@@ -727,49 +812,6 @@ function InviteSheet({
           </Button>
         )}
       </div>
-    </SidePanel>
-  );
-}
-
-function StudentsSheet({
-  group,
-  kind,
-  open,
-  onOpenChange,
-  onInvite,
-}: {
-  group: GroupDetail;
-  kind: EducatorType;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onInvite: () => void;
-}) {
-  return (
-    <SidePanel
-      title={`${kind === "parent" ? "Children" : "Students"} · ${group.member_count}`}
-      description="Everyone who joined with your link or code."
-      open={open}
-      onOpenChange={onOpenChange}
-    >
-      {group.members.length === 0 ? (
-        <div className="flex flex-col items-start gap-4">
-          <p className="text-muted-foreground">No one has joined yet.</p>
-          <Button variant="outline" size="touch" onClick={onInvite}>
-            <UserPlusIcon aria-hidden="true" />
-            Invite {membersNoun(kind)}
-          </Button>
-        </div>
-      ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
-          {group.members.map((member) => (
-            <MemberRow
-              key={member.student_id}
-              groupId={group.group_id}
-              member={member}
-            />
-          ))}
-        </ul>
-      )}
     </SidePanel>
   );
 }

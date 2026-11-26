@@ -1,12 +1,13 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import { Suspense, type CSSProperties, type FormEvent } from "react";
+import { Suspense, useState, type CSSProperties, type FormEvent } from "react";
 
 import { WelcomeMark } from "@/components/brand/welcome-mark";
 import { FormMessage } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
 import { AssignedList } from "@/components/viva/assigned-list";
+import { AssignedPanel } from "@/components/viva/assigned-panel";
 import { ChoiceBar } from "@/components/viva/choice-bar";
 import { PRIVATE_CLASS } from "@/lib/analytics/privacy";
 import type { CurriculumSelection } from "@/lib/curriculum/types";
@@ -46,6 +47,7 @@ export function VivaSetup({
   // Only students reach this screen (the gate sends educators to /teach), and
   // a student's profile always has a class.
   const setup = useVivaSetup(profile.class_level ?? MIN_CLASS_LEVEL);
+  const [allVivasOpen, setAllVivasOpen] = useState(false);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -55,13 +57,32 @@ export function VivaSetup({
 
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+      {onStartAssigned ? (
+        // Every set viva, a tap away in the top corner. It floats: sticky at
+        // the top as home scrolls, and taking no room of its own (h-0), so
+        // the welcome below never moves.
+        <div className="pointer-events-none sticky top-3 z-20 flex h-0 justify-end px-3 sm:top-5 sm:px-6">
+          <div className="pointer-events-auto">
+            <AssignedPanel
+              starting={starting}
+              onStart={onStartAssigned}
+              open={allVivasOpen}
+              onOpenChange={setAllVivasOpen}
+            />
+          </div>
+        </div>
+      ) : null}
       <main className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-10 text-center">
         <WelcomeMark className="w-48 sm:w-60" />
         <Greeting profile={profile} line={lineFor(setup, starting)} />
         {onStartAssigned ? (
           // Which one to point out comes from the address.
           <Suspense fallback={null}>
-            <AssignedList starting={starting} onStart={onStartAssigned} />
+            <AssignedList
+              starting={starting}
+              onStart={onStartAssigned}
+              onShowAll={() => setAllVivasOpen(true)}
+            />
           </Suspense>
         ) : null}
       </main>
@@ -184,14 +205,15 @@ function LastVivaNotice() {
         <p>
           <span className="font-medium">Your viva stopped.</span> {reason}
         </p>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-lg"
           aria-label="Dismiss"
           onClick={() => setError(null)}
-          className="-m-2 flex size-9 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="-m-2"
         >
-          <XIcon className="size-4" aria-hidden="true" />
-        </button>
+          <XIcon aria-hidden="true" />
+        </Button>
       </div>
     </FormMessage>
   );

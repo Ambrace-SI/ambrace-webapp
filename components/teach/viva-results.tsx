@@ -184,32 +184,19 @@ export function VivaResults() {
 
   return (
     <main className="animate-rise mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-10 sm:px-10 sm:py-14">
-      <header className="flex flex-col gap-4">
-        <BackLink href={groupHref}>
-          {group?.name ?? "Back to the group"}
-        </BackLink>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-col gap-2">
-            <p className="label-mono text-muted-foreground">
-              {stage === "completed" ? "Completed" : "Ongoing"}
-            </p>
-            <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
-              {assignment.title}
-            </h1>
-            <VivaMeta
-              assignment={assignment}
-              overdue={isOverdue(progress, members)}
-              className="whitespace-normal"
-            />
-          </div>
+      <header className="flex flex-col gap-5">
+        <div className="flex items-center justify-between gap-3">
+          <BackLink href={groupHref}>
+            {group?.name ?? "Back to the group"}
+          </BackLink>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="outline"
+                variant="glass"
                 size="icon-touch"
                 aria-label="Viva options"
               >
-                <EllipsisIcon aria-hidden="true" />
+                <EllipsisIcon aria-hidden="true" strokeWidth={2.5} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -222,6 +209,19 @@ export function VivaResults() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className="label-mono text-muted-foreground">
+            {stage === "completed" ? "Completed" : "Ongoing"}
+          </p>
+          <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
+            {assignment.title}
+          </h1>
+          <VivaMeta
+            assignment={assignment}
+            overdue={isOverdue(progress, members)}
+            className="whitespace-normal"
+          />
         </div>
       </header>
 
@@ -336,7 +336,7 @@ function StudentList({
         {title}
         <span className="font-mono text-xs text-muted-foreground">{count}</span>
       </h2>
-      <ul className="flex flex-col gap-0.5 rounded-xl border border-border bg-card p-1.5">
+      <ul className="flex flex-col gap-0.5 glass-card rounded-2xl p-1.5">
         {children}
       </ul>
     </section>

@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -27,10 +33,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const address = vi.hoisted(() => ({ search: "id=g1", replace: vi.fn() }));
+const address = vi.hoisted(() => ({
+  search: "id=g1",
+  replace: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(address.search),
-  useRouter: () => ({ replace: address.replace }),
+  useRouter: () => ({ replace: address.replace, push: address.push }),
 }));
 
 const { toast } = vi.hoisted(() => ({
@@ -121,9 +131,31 @@ describe("the list of a student's groups", () => {
     expect(screen.getByRole("link", { name: /Home/ }).textContent).toMatch(
       /Parent · Anita$/,
     );
-    expect(
-      screen.getByRole("link", { name: "Join a group" }).getAttribute("href"),
-    ).toBe("/join");
+  });
+
+  test("Join a group opens the code box in a window that can be closed", async () => {
+    groupsApi.listJoinedGroups.mockResolvedValue([]);
+    renderPage(<StudentGroups />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Join a group" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Enter your group code",
+    });
+    await user.type(within(dialog).getByLabelText("Code"), "k7qx-2m");
+    await user.click(within(dialog).getByRole("button", { name: "Continue" }));
+    expect(address.push).toHaveBeenCalledWith("/join?code=K7QX2M");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await user.click(screen.getByRole("button", { name: "Join a group" }));
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   test("with none, explains how to get into one", async () => {

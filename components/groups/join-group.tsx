@@ -9,11 +9,23 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/forms/fields";
+import { BackLink } from "@/components/app/back-link";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { track } from "@/lib/analytics/events";
 import { httpStatus } from "@/lib/api/errors";
-import { HOME_PATH, JOIN_CODE_PARAM, joinPath } from "@/lib/auth/routes";
+import {
+  HOME_PATH,
+  JOIN_CODE_PARAM,
+  STUDENT_GROUPS_PATH,
+  joinPath,
+} from "@/lib/auth/routes";
 import { useInvitePreview, useJoinGroup } from "@/lib/groups/use-groups";
 import { EDUCATOR_LABELS } from "@/types/profile";
 
@@ -29,23 +41,97 @@ export function JoinGroup() {
   return code ? <Invite code={code} /> : <EnterCode />;
 }
 
-function EnterCode({ initialError }: { initialError?: string }) {
+/** A code typed or read off a board, tidied: spaces and dashes dropped. */
+function cleanCode(raw: string): string {
+  return raw.replace(/[\s-]/g, "").toUpperCase();
+}
+
+/**
+ * The code box and its button. On a valid-looking code it opens the invite,
+ * which says who is inviting before anything is joined. From the dialog the
+ * invite is a new page, so Back returns to the groups; on /join it replaces
+ * the code page.
+ */
+function CodeForm({
+  initialError,
+  onDone,
+}: {
+  initialError?: string;
+  onDone?: () => void;
+}) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState(initialError);
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const cleaned = code.replace(/[\s-]/g, "").toUpperCase();
+    const cleaned = cleanCode(code);
     if (cleaned.length !== 6) {
       setError("A code has 6 letters and numbers.");
       return;
     }
-    router.replace(joinPath(cleaned));
+    if (onDone) {
+      onDone();
+      router.push(joinPath(cleaned));
+    } else {
+      router.replace(joinPath(cleaned));
+    }
   }
 
   return (
+    <form onSubmit={submit} noValidate className="flex flex-col gap-6">
+      <TextField
+        label="Code"
+        name="join-code"
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        maxLength={9}
+        className="font-mono text-lg tracking-[0.2em] uppercase"
+        value={code}
+        onChange={(event) => setCode(event.target.value)}
+        error={error}
+      />
+      <SubmitButton variant="ember" pending={false} pendingLabel="">
+        Continue
+      </SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * "Join a group" from the groups page: the code box in a window over the
+ * page, with a close button, so changing your mind is one tap.
+ */
+export function JoinCodeDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showClose className="gap-6 p-6 sm:max-w-sm">
+        <div className="flex flex-col gap-1.5 pr-12">
+          <DialogTitle className="text-xl font-medium">
+            Enter your group code
+          </DialogTitle>
+          <DialogDescription className="text-base">
+            Your teacher or parent will have shared it with you.
+          </DialogDescription>
+        </div>
+        {open ? <CodeForm onDone={() => onOpenChange(false)} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The code box as a page: /join opened without a code, or with a bad one. */
+function EnterCode({ initialError }: { initialError?: string }) {
+  return (
     <JoinFrame>
+      <BackLink href={STUDENT_GROUPS_PATH}>Your groups</BackLink>
       <div className="flex flex-col gap-3">
         <p className="label-mono text-muted-foreground">Join a group</p>
         <h1 className="text-3xl font-light tracking-tight sm:text-4xl">
@@ -55,23 +141,7 @@ function EnterCode({ initialError }: { initialError?: string }) {
           Your teacher or parent will have shared it with you.
         </p>
       </div>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-6">
-        <TextField
-          label="Code"
-          name="join-code"
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          maxLength={9}
-          className="font-mono text-lg tracking-[0.2em] uppercase"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          error={error}
-        />
-        <SubmitButton variant="ember" pending={false} pendingLabel="">
-          Continue
-        </SubmitButton>
-      </form>
+      <CodeForm initialError={initialError} />
     </JoinFrame>
   );
 }
