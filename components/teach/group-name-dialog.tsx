@@ -59,7 +59,7 @@ export function NewGroupDialog() {
       open={open}
       onOpenChange={(next) => !next && newGroupDialog.close()}
     >
-      <DialogContent>
+      <DialogContent showClose>
         {/* Mounted only while open, so each new group starts blank. */}
         {open ? <NewGroupForm /> : null}
       </DialogContent>
@@ -96,7 +96,7 @@ function NewGroupForm() {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 pr-12">
         <DialogTitle>New group</DialogTitle>
         <DialogDescription>
           A class, a tuition batch or your own children. You&apos;ll get a link
@@ -147,7 +147,7 @@ export function RenameGroupDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent showClose>
         {open ? (
           <RenameForm
             groupId={groupId}
@@ -189,7 +189,7 @@ function RenameForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-6">
-      <DialogTitle>Rename group</DialogTitle>
+      <DialogTitle className="pr-12">Rename group</DialogTitle>
       {formError ? <FormMessage tone="error">{formError}</FormMessage> : null}
       <TextField
         label="Group name"

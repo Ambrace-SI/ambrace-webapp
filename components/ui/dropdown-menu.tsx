@@ -38,7 +38,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         collisionPadding={12}
         className={cn(
-          "z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
+          "z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden glass-panel rounded-2xl p-1.5 text-popover-foreground duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
           className,
         )}
         {...props}

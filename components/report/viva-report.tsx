@@ -257,7 +257,7 @@ export function ReportOutline() {
         <div className="h-8 w-80 max-w-full animate-pulse rounded bg-muted" />
       </div>
       <div className="h-20 w-40 animate-pulse rounded bg-muted" />
-      <div className="h-40 animate-pulse rounded-xl border border-border bg-card" />
+      <div className="glass-card h-40 animate-pulse rounded-2xl" />
     </main>
   );
 }

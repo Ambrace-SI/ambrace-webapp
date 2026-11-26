@@ -112,6 +112,32 @@
   /* The hairline of light along the top of a glass card. Nothing in the
      palette is lighter than Paper, so on Paper it is white, kept faint. */
   --glass-highlight: rgb(255 255 255 / 0.6);
+  /* The glass button: a pill of frosted glass lit from above. Top to bottom
+     it goes from near-white to Paper; a shine sits on its top edge, a shade
+     on its bottom edge, and it casts a soft Ink shadow. */
+  --glass-top: rgb(255 255 255 / 0.92);
+  --glass-bottom: rgb(236 235 242 / 0.82); /* Mist */
+  --glass-top-hover: rgb(255 255 255);
+  --glass-bottom-hover: rgb(244 243 239 / 0.96); /* Paper */
+  --glass-edge: rgb(11 11 16 / 0.14);
+  --glass-edge-hover: rgb(11 11 16 / 0.26);
+  --glass-shine: rgb(255 255 255 / 0.95);
+  --glass-shade: rgb(11 11 16 / 0.07);
+  --glass-sheen: rgb(255 255 255 / 0.75);
+  --glass-drop-near: rgb(11 11 16 / 0.08);
+  --glass-drop-far: rgb(11 11 16 / 0.2);
+  --glass-drop-far-hover: rgb(11 11 16 / 0.3);
+  --glass-press: rgb(11 11 16 / 0.16);
+  /* Cards and lists: quieter glass than a button, so buttons still lead. */
+  --glass-card-top: rgb(255 255 255 / 0.82);
+  --glass-card-bottom: rgb(251 250 247 / 0.62);
+  --glass-card-edge: rgb(11 11 16 / 0.1);
+  /* Windows over the page: dialogs, side panels, menus. */
+  --glass-panel-top: rgb(255 255 255 / 0.94);
+  --glass-panel-bottom: rgb(244 243 239 / 0.9); /* Paper */
+  /* A field sits slightly into the page. */
+  --glass-well: rgb(11 11 16 / 0.025);
+  --glass-well-shade: rgb(11 11 16 / 0.07);
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10; /* never white on Ember: 2.8:1 fails, Ink is 6.9:1 */
@@ -162,6 +188,26 @@
   --scrim: rgb(11 11 16 / 0.72);
   --scrollbar: #3a3946; /* Orbit dark */
   --glass-highlight: rgb(236 235 242 / 0.06); /* Mist, barely there */
+  --glass-top: rgb(236 235 242 / 0.14);
+  --glass-bottom: rgb(236 235 242 / 0.04);
+  --glass-top-hover: rgb(236 235 242 / 0.2);
+  --glass-bottom-hover: rgb(236 235 242 / 0.08);
+  --glass-edge: rgb(236 235 242 / 0.14);
+  --glass-edge-hover: rgb(236 235 242 / 0.28);
+  --glass-shine: rgb(236 235 242 / 0.2);
+  --glass-shade: rgb(0 0 0 / 0.35);
+  --glass-sheen: rgb(236 235 242 / 0.1);
+  --glass-drop-near: rgb(0 0 0 / 0.4);
+  --glass-drop-far: rgb(0 0 0 / 0.55);
+  --glass-drop-far-hover: rgb(0 0 0 / 0.75);
+  --glass-press: rgb(0 0 0 / 0.5);
+  --glass-card-top: rgb(236 235 242 / 0.07);
+  --glass-card-bottom: rgb(236 235 242 / 0.025);
+  --glass-card-edge: rgb(236 235 242 / 0.1);
+  --glass-panel-top: rgb(36 35 47 / 0.94);
+  --glass-panel-bottom: rgb(28 27 37 / 0.92); /* Graphite */
+  --glass-well: rgb(0 0 0 / 0.22);
+  --glass-well-shade: rgb(0 0 0 / 0.45);
 
   --ember: #ff6b4a;
   --ember-foreground: #0b0b10;
@@ -243,6 +289,242 @@
 }
 
 @layer utilities {
+  /*
+   * Buttons. Every <Button> is the same object: a pill of glass, lit from
+   * above, with a gloss on its top half. It lifts toward you on hover and is
+   * pushed into the page on a press. Built so that someone new to apps can
+   * see at once that it is a thing to press. A variant changes only its
+   * colour:
+   *
+   *   default, ember            lit: a solid pill of --lit, the one action
+   *                             on a screen that moves things forward
+   *   glass, outline, secondary frosted glass, for everything else
+   *   destructive               frosted glass, with red words
+   *   ghost                     no glass until hovered, for rows and lists
+   *   link                      words only, no pill and no movement
+   */
+  [data-button] {
+    isolation: isolate;
+    border-radius: 9999px;
+    transition:
+      background 200ms ease,
+      border-color 200ms ease,
+      box-shadow 200ms ease,
+      color 200ms ease,
+      transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Glass: frosted, lit from above. */
+  [data-button]:is(
+    [data-variant="glass"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ),
+  [data-button][data-variant="ghost"]:is(:hover, [aria-expanded="true"]) {
+    border-color: var(--glass-edge);
+    background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      inset 0 -1px 0 var(--glass-shade),
+      0 1px 2px var(--glass-drop-near),
+      0 6px 16px -6px var(--glass-drop-far);
+  }
+  [data-button]:is(
+      [data-variant="glass"],
+      [data-variant="outline"],
+      [data-variant="secondary"],
+      [data-variant="destructive"],
+      [data-variant="ghost"]
+    ):is(:hover, [aria-expanded="true"]) {
+    border-color: var(--glass-edge-hover);
+    background: linear-gradient(
+      180deg,
+      var(--glass-top-hover),
+      var(--glass-bottom-hover)
+    );
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      inset 0 -1px 0 var(--glass-shade),
+      0 2px 4px var(--glass-drop-near),
+      0 12px 28px -10px var(--glass-drop-far-hover);
+  }
+  [data-button][data-variant="destructive"] {
+    border-color: color-mix(in oklch, var(--destructive), transparent 65%);
+  }
+  [data-button]:is(
+      [data-variant="glass"],
+      [data-variant="outline"],
+      [data-variant="secondary"],
+      [data-variant="destructive"],
+      [data-variant="ghost"]
+    ):active {
+    background: linear-gradient(180deg, var(--glass-bottom), var(--glass-top));
+    box-shadow:
+      inset 0 2px 4px var(--glass-press),
+      inset 0 -1px 0 var(--glass-shine),
+      0 1px 1px var(--glass-drop-near);
+  }
+
+  /* Lit: a solid pill of --lit. */
+  [data-button][data-variant="default"] {
+    --lit: var(--primary);
+  }
+  [data-button][data-variant="ember"] {
+    --lit: var(--ember);
+  }
+  [data-button]:is([data-variant="default"], [data-variant="ember"]) {
+    border-color: color-mix(in oklch, var(--lit), #0b0b10 18%);
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--lit), #ffffff 16%),
+      var(--lit)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.35),
+      inset 0 -1px 0 rgb(11 11 16 / 0.18),
+      0 1px 2px var(--glass-drop-near),
+      0 6px 16px -6px color-mix(in oklch, var(--lit), transparent 35%);
+  }
+  [data-button]:is([data-variant="default"], [data-variant="ember"]):hover {
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--lit), #ffffff 24%),
+      color-mix(in oklch, var(--lit), #ffffff 4%)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.4),
+      inset 0 -1px 0 rgb(11 11 16 / 0.18),
+      0 2px 4px var(--glass-drop-near),
+      0 12px 26px -10px color-mix(in oklch, var(--lit), transparent 20%);
+  }
+  [data-button]:is([data-variant="default"], [data-variant="ember"]):active {
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--lit), #0b0b10 8%),
+      var(--lit)
+    );
+    box-shadow:
+      inset 0 2px 4px rgb(11 11 16 / 0.28),
+      0 1px 1px var(--glass-drop-near);
+  }
+
+  /* The gloss over the top half, under the label. */
+  [data-button]:not([data-variant="link"], [data-variant="ghost"])::before,
+  [data-button][data-variant="ghost"]:hover::before {
+    content: "";
+    position: absolute;
+    inset: 1px 1px 50% 1px;
+    z-index: -1;
+    border-radius: 9999px 9999px 40% 40% / 9999px 9999px 60% 60%;
+    background: linear-gradient(180deg, var(--glass-sheen), transparent);
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  [data-button]:is([data-variant="default"], [data-variant="ember"])::before {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.28), transparent);
+  }
+  [data-button]:active::before {
+    opacity: 0.35;
+  }
+
+  /* Not available yet: flat, unlit glass, so it doesn't look pressable. */
+  [data-button]:not([data-variant="link"]):is(
+      :disabled,
+      [aria-disabled="true"]
+    ) {
+    border-color: var(--glass-edge);
+    background: var(--glass-bottom);
+    box-shadow: inset 0 1px 0 var(--glass-shine);
+  }
+  [data-button]:is(:disabled, [aria-disabled="true"])::before {
+    content: none;
+  }
+
+  /* The movement, the same for every pill: lift on hover, sink on a press. */
+  [data-button]:not([data-variant="link"]):hover {
+    transform: translateY(-1px);
+  }
+  [data-button]:not([data-variant="link"]):active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  /*
+   * Glass card: lists, cards and code boxes. Quieter than a button, so the
+   * buttons on it still read first. Add glass-card-link when the whole card
+   * is something to tap: it then lifts on hover like a button.
+   */
+  .glass-card {
+    border: 1px solid var(--glass-card-edge);
+    background: linear-gradient(
+      180deg,
+      var(--glass-card-top),
+      var(--glass-card-bottom)
+    );
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      0 1px 2px var(--glass-drop-near),
+      0 10px 28px -16px var(--glass-drop-far);
+  }
+  .glass-card-link {
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease,
+      transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .glass-card-link:hover {
+    transform: translateY(-2px);
+    border-color: var(--glass-edge-hover);
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      0 2px 4px var(--glass-drop-near),
+      0 16px 32px -14px var(--glass-drop-far-hover);
+  }
+  .glass-card-link:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  /* Glass panel: dialogs, side panels, menus and popovers over the page. */
+  .glass-panel {
+    border: 1px solid var(--glass-edge);
+    background: linear-gradient(
+      180deg,
+      var(--glass-panel-top),
+      var(--glass-panel-bottom)
+    );
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      0 2px 6px var(--glass-drop-near),
+      0 24px 60px -20px var(--glass-drop-far-hover);
+  }
+
+  /* A field, set slightly into the page: a well with a shade along its top. */
+  [data-slot="input"].glass-well,
+  .glass-well {
+    background-color: var(--glass-well);
+    box-shadow: inset 0 1px 2px var(--glass-well-shade);
+  }
+
+  /* For people who ask for less motion, colours still change; nothing moves. */
+  @media (prefers-reduced-motion: reduce) {
+    [data-button],
+    .glass-card-link {
+      transition: none;
+    }
+    [data-button]:hover,
+    [data-button]:active,
+    .glass-card-link:hover,
+    .glass-card-link:active {
+      transform: none;
+    }
+  }
+
   /* Small technical labels and live status ("listening", "analysing"). */
   .label-mono {
     font-family: var(--font-mono);

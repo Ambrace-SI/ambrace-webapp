@@ -4,6 +4,8 @@ import "./globals.css";
 
 import { useEffect } from "react";
 
+import { Button } from "@/components/ui/button";
+
 /**
  * The last resort: shown only when the frame every page shares has itself
  * broken, so none of that frame (fonts, providers, the side panel) can be
@@ -38,13 +40,9 @@ export default function GlobalError({
           </p>
         </div>
         <div className="mx-auto flex w-full max-w-2xl gap-3">
-          <button
-            type="button"
-            onClick={() => retry()}
-            className="h-11 rounded-lg bg-primary px-5 text-base font-medium text-primary-foreground"
-          >
+          <Button size="touch" onClick={() => retry()}>
             Try again
-          </button>
+          </Button>
         </div>
       </body>
     </html>

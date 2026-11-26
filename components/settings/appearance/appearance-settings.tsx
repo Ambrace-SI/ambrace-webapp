@@ -33,7 +33,7 @@ export function AppearanceSettings() {
         {THEME_OPTIONS.map(({ value, label, description, icon: Icon }) => (
           <label
             key={value}
-            className="group flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/40 has-checked:border-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+            className="group flex cursor-pointer flex-col gap-3 glass-card glass-card-link rounded-2xl p-3 has-checked:border-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
           >
             <input
               type="radio"

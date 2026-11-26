@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -171,9 +172,14 @@ describe("the submit button", () => {
 describe("buttons", () => {
   test("the Ember button labels itself in Ink, never white", () => {
     render(<Button variant="ember">Continue</Button>);
-    const classes = screen.getByRole("button").className;
+    const button = screen.getByRole("button");
+    const classes = button.className;
 
-    expect(classes).toContain("bg-ember");
+    // The lit Ember fill comes from the shared button rules in globals.css.
+    expect(button.dataset.variant).toBe("ember");
+    expect(
+      readFileSync("app/globals.css", "utf8").replace(/\s+/g, " "),
+    ).toContain('[data-button][data-variant="ember"] { --lit: var(--ember); }');
     expect(classes).toContain("text-ember-foreground");
     expect(classes).not.toContain("text-white");
   });

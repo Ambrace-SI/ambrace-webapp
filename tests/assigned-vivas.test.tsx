@@ -213,10 +213,10 @@ describe("the vivas on a teacher's group page", () => {
     ).toBe("/teach/assign?id=g1");
   });
 
-  test("finished business moves to Completed; the rest stays Ongoing", async () => {
+  test("every viva is on the Vivas tab; only overdue gets colour", async () => {
     groupsApi.getGroup.mockResolvedValue(GROUP);
     groupsApi.listAssignments.mockResolvedValue([
-      // Past due and everyone done: completed.
+      // Past due and everyone done: finished, still listed.
       {
         ...SET,
         assignment_id: "a1",
@@ -224,47 +224,20 @@ describe("the vivas on a teacher's group page", () => {
         due_on: PAST,
         ...ALL_DONE,
       },
-      // Past due, someone still to do it: ongoing, and overdue.
+      // Past due, someone still to do it: overdue.
       { ...SET, assignment_id: "a2", title: "Force", due_on: PAST },
-      // Everyone done but no due day: stays open, so ongoing.
-      {
-        ...SET,
-        assignment_id: "a3",
-        title: "Sound",
-        due_on: null,
-        ...ALL_DONE,
-      },
     ]);
-    const user = renderWith(<GroupPage />);
+    renderWith(<GroupPage />);
 
-    const ongoing = await screen.findByRole("tab", { name: /Ongoing/ });
-    expect(ongoing.getAttribute("aria-selected")).toBe("true");
-    expect(ongoing.textContent).toBe("Ongoing2");
+    const vivas = await screen.findByRole("tab", { name: /Vivas/ });
+    expect(vivas.getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(vivas.textContent).toBe("Vivas2"));
     const panel = screen.getByRole("tabpanel");
-    expect(within(panel).queryByText("Motion")).toBeNull();
+    expect(within(panel).getByText("Motion")).toBeTruthy();
     expect(within(panel).getByText("Force")).toBeTruthy();
-    expect(within(panel).getByText("Sound")).toBeTruthy();
-    const overdue = within(panel).getByText(/^Overdue, was due /);
-    expect(overdue.className).toMatch(/text-ember-text/);
-
-    await user.click(screen.getByRole("tab", { name: /Completed/ }));
-
-    const done = screen.getByRole("tabpanel");
-    expect(within(done).getByText("Motion")).toBeTruthy();
-    expect(within(done).queryByText("Force")).toBeNull();
-  });
-
-  test("an empty pile says what belongs in it", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValue([
-      { ...SET, due_on: PAST, ...ALL_DONE },
-    ]);
-    const user = renderWith(<GroupPage />);
-
-    await screen.findByText(/Nothing ongoing/);
-    await user.click(screen.getByRole("tab", { name: /Completed/ }));
-    await user.click(screen.getByRole("tab", { name: /Ongoing/ }));
-    await screen.findByText(/Nothing ongoing/);
+    const overdue = within(panel).getAllByText(/^Overdue, was due /);
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].className).toMatch(/text-ember-text/);
   });
 
   test("a viva set for nobody yet has nothing to average", async () => {
@@ -276,18 +249,6 @@ describe("the vivas on a teacher's group page", () => {
 
     await screen.findByText("No one joined yet");
     expect(screen.getByLabelText("No scores yet").textContent).toBe("–");
-  });
-
-  test("Completed explains itself until something gets there", async () => {
-    groupsApi.getGroup.mockResolvedValue(GROUP);
-    groupsApi.listAssignments.mockResolvedValue([SET]);
-    const user = renderWith(<GroupPage />);
-
-    await user.click(await screen.findByRole("tab", { name: /Completed/ }));
-
-    expect(
-      screen.getByText(/once their due date has passed and everyone/),
-    ).toBeTruthy();
   });
 
   test("with none set, say what setting one does", async () => {

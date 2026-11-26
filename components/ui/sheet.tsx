@@ -40,7 +40,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col border-border bg-popover text-sm text-popover-foreground shadow-lg duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-open:animate-in data-closed:animate-out data-closed:duration-200 motion-reduce:animate-none",
+          "fixed z-50 flex flex-col glass-panel text-sm text-popover-foreground duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-open:animate-in data-closed:animate-out data-closed:duration-200 motion-reduce:animate-none",
           SIDES[side],
           className,
         )}

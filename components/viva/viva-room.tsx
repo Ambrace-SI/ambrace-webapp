@@ -274,7 +274,7 @@ function RoomOutline() {
         </div>
       </main>
       <div className="mx-auto w-full max-w-4xl px-3 pb-4 sm:px-6 sm:pb-6">
-        <div className="h-72 animate-pulse rounded-[20px] border border-border bg-surface md:h-[4.375rem]" />
+        <div className="h-72 animate-pulse glass-card rounded-[24px] md:h-[4.375rem]" />
       </div>
     </div>
   );

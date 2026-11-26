@@ -143,7 +143,7 @@ function Row({
     <section
       aria-labelledby={labelledBy}
       aria-label={labelledBy ? undefined : "Feedback"}
-      className="animate-rise flex flex-col gap-2 rounded-2xl border border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+      className="glass-card animate-rise flex flex-col gap-2 rounded-2xl px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
     >
       {children}
     </section>

@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 /**
  * The way back to the page above, at the top of a page.
  *
- * Bold and in full-strength text: it is how people find their way around on a
- * phone, so it must not read as a faint caption.
+ * A frosted pill with an arrow, not a line of text: many teachers and parents
+ * are new to apps, and it has to look like something you press. The arrow
+ * side is padded less than the label side, because a glyph reads as further
+ * in than words do.
  */
 export function BackLink({
   href,
@@ -20,12 +22,17 @@ export function BackLink({
   return (
     <Button
       asChild
-      variant="ghost"
+      variant="glass"
       size="touch"
-      className="-ml-3 max-w-full self-start px-3 font-semibold text-foreground"
+      className="group/back max-w-full self-start pr-5 pl-3.5"
     >
       <Link href={href}>
-        <ArrowLeftIcon aria-hidden="true" strokeWidth={2.5} />
+        {/* On hover the arrow leans the way it goes. */}
+        <ArrowLeftIcon
+          aria-hidden="true"
+          strokeWidth={2.5}
+          className="transition-transform duration-200 group-hover/back:-translate-x-0.5 motion-reduce:transition-none"
+        />
         <span className="truncate">{children}</span>
       </Link>
     </Button>

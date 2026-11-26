@@ -81,10 +81,10 @@ export function ChoiceChips<Value extends string | number>({
               }
               onKeyDown={(event) => moveBy(event, index)}
               className={cn(
-                "flex h-11 items-center justify-center rounded-lg border px-3 text-base transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98]",
+                "flex h-11 items-center justify-center rounded-full border px-3 text-base transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.97] motion-reduce:active:scale-100",
                 selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-card hover:border-foreground/40",
+                  ? "border-primary bg-primary font-semibold text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.25)]"
+                  : "glass-card glass-card-link",
               )}
             >
               {option.label}
