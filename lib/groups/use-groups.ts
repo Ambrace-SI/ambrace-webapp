@@ -12,7 +12,9 @@ import {
   createGroup,
   deleteAssignment,
   deleteGroup,
+  generateClassInsight,
   getAssignmentResults,
+  getClassInsight,
   getGroup,
   getStudentReport,
   joinGroup,
@@ -29,6 +31,7 @@ import {
 import type {
   Assignment,
   AssignmentCreate,
+  ClassInsightState,
   StudentAssignment,
 } from "@/types/assignments";
 import type { GroupCreate, GroupDetail, GroupSummary } from "@/types/groups";
@@ -47,6 +50,8 @@ export const reportKey = (
   assignmentId: string,
   studentId: string,
 ) => [...resultsKey(groupId, assignmentId), studentId] as const;
+export const insightKey = (groupId: string, assignmentId: string) =>
+  [...resultsKey(groupId, assignmentId), "insight"] as const;
 /** The student's set vivas. Refreshed whenever a viva ends. */
 export const ASSIGNED_KEY = ["groups", "assigned"] as const;
 
@@ -285,5 +290,37 @@ export function useStudentReport(
         studentId as string,
       ),
     enabled: Boolean(groupId && assignmentId && studentId),
+  });
+}
+
+// ------------------------------------------------------ AI class insight
+
+/**
+ * Not polled: `refreshOn` (how many have finished) changes when the results
+ * page's own poll sees a new result, and that is when the answer can change.
+ */
+export function useClassInsight(
+  groupId: string,
+  assignmentId: string,
+  refreshOn: number,
+) {
+  return useQuery({
+    queryKey: [...insightKey(groupId, assignmentId), refreshOn],
+    queryFn: () => getClassInsight(groupId, assignmentId),
+    staleTime: 0,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useGenerateClassInsight(groupId: string, assignmentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => generateClassInsight(groupId, assignmentId),
+    onSuccess: (state) => {
+      queryClient.setQueriesData<ClassInsightState>(
+        { queryKey: insightKey(groupId, assignmentId) },
+        () => state,
+      );
+    },
   });
 }

@@ -78,3 +78,40 @@ export type StudentReport = {
   feedback: ResultFeedback;
   completed_at: string;
 };
+
+// ------------------------------------------------------ AI class insight
+
+export type InsightStudent = { student_id: string; name: string };
+
+/** A point shared by part of the class. The count comes from the server. */
+export type InsightTheme = {
+  point: string;
+  student_count: number;
+  students: InsightStudent[];
+  misconception: string | null;
+};
+
+export type ClassInsight = {
+  overview: string;
+  strengths: InsightTheme[];
+  gaps: InsightTheme[];
+  students_to_support: { student: InsightStudent; reason: string }[];
+  suggestions: { action: string; addresses: string | null }[];
+  coverage_note: string;
+  /** How many students' reports it was written from. */
+  based_on: number;
+  generator_id: string;
+  generated_at: string;
+};
+
+export type ClassInsightState = {
+  status: "not_enough_results" | "ready_to_generate" | "ready";
+  /** Finished vivas by students now in the group, out of member_count. */
+  results_count: number;
+  member_count: number;
+  min_results: number;
+  /** Results changed since the insight was written; new_results arrived. */
+  is_stale: boolean;
+  new_results: number;
+  insight: ClassInsight | null;
+};

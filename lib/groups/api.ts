@@ -3,6 +3,7 @@ import type {
   Assignment,
   AssignmentCreate,
   AssignmentResults,
+  ClassInsightState,
   StudentAssignment,
   StudentReport,
 } from "@/types/assignments";
@@ -158,4 +159,30 @@ export async function getStudentReport(
       `${resultsPath(groupId, assignmentId)}/${encodeURIComponent(studentId)}`,
     )
   ).data;
+}
+
+// ------------------------------------------------------ AI class insight
+
+const insightPath = (groupId: string, assignmentId: string) =>
+  `${assignmentsPath(groupId)}/${encodeURIComponent(assignmentId)}/insight`;
+
+/** The saved class insight for one set viva, or whether one can be written. */
+export async function getClassInsight(
+  groupId: string,
+  assignmentId: string,
+): Promise<ClassInsightState> {
+  return (await api.get<ClassInsightState>(insightPath(groupId, assignmentId)))
+    .data;
+}
+
+/**
+ * Writes the class insight. The server returns the saved one unchanged when
+ * no results have arrived since, so asking twice costs nothing.
+ */
+export async function generateClassInsight(
+  groupId: string,
+  assignmentId: string,
+): Promise<ClassInsightState> {
+  return (await api.post<ClassInsightState>(insightPath(groupId, assignmentId)))
+    .data;
 }
