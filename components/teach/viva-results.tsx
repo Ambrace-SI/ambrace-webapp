@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { BackLink } from "@/components/app/back-link";
 import { PageNotice } from "@/components/app/page-notice";
 import { ReportBody } from "@/components/report/viva-report";
+import { ClassInsight } from "@/components/teach/class-insight";
 import { Progress, VivaMeta } from "@/components/teach/group-page";
 import { Button } from "@/components/ui/button";
 import {
@@ -252,6 +253,14 @@ export function VivaResults() {
           </div>
         ) : null}
       </section>
+
+      {members > 0 ? (
+        <ClassInsight
+          groupId={groupId}
+          assignmentId={assignmentId}
+          finished={doneInGroup}
+        />
+      ) : null}
 
       {data.students.length === 0 ? (
         <p className="text-muted-foreground">

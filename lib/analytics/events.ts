@@ -117,6 +117,8 @@ export type ProductEvents = {
   assignment_results_viewed: { completed: number; students: number };
   /** The owner opened a student's report. */
   student_report_viewed: Record<string, never>;
+  /** The owner asked for the AI class insight. Counts only, never its text. */
+  class_insight_requested: { based_on: number; refreshed: boolean };
   /** The owner deleted a group; `members` is how many were in it. */
   group_deleted: { members: number };
   /** A student opened an invite link; `found` is false for a dead code. */

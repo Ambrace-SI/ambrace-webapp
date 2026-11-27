@@ -72,6 +72,8 @@ const groupsApi = vi.hoisted(() => ({
   deleteAssignment: vi.fn(),
   getAssignmentResults: vi.fn(),
   getStudentReport: vi.fn(),
+  getClassInsight: vi.fn(),
+  generateClassInsight: vi.fn(),
 }));
 vi.mock("@/lib/groups/api", () => groupsApi);
 
@@ -175,6 +177,15 @@ function renderWith(ui: ReactNode) {
 beforeEach(() => {
   Object.values(groupsApi).forEach((fn) => fn.mockReset());
   groupsApi.getGroup.mockResolvedValue(GROUP);
+  groupsApi.getClassInsight.mockResolvedValue({
+    status: "not_enough_results",
+    results_count: 1,
+    member_count: 2,
+    min_results: 3,
+    is_stale: false,
+    new_results: 0,
+    insight: null,
+  });
   analytics.track.mockReset();
   toast.success.mockReset();
   toast.error.mockReset();
